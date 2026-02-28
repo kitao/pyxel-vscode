@@ -1,0 +1,83 @@
+{
+  "name": "pyxel-vscode",
+  "displayName": "Pyxel",
+  "description": "Run Pyxel games directly in VS Code — no installation required",
+  "version": "0.1.0",
+  "publisher": "kitao",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kitao/pyxel-vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "icon": "media/icon.png",
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "pyxel",
+    "retro",
+    "game",
+    "pixel-art",
+    "python",
+    "gamedev"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pyxel.run",
+        "title": "Pyxel: Run",
+        "icon": {
+          "light": "media/pyxel-run-light.svg",
+          "dark": "media/pyxel-run-dark.svg"
+        }
+      },
+      {
+        "command": "pyxel.newResource",
+        "title": "Pyxel: New Resource"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "pyxel.run",
+          "when": "resourceExtname == .py",
+          "group": "navigation"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "pyxel.editor",
+        "displayName": "Pyxel Editor",
+        "selector": [
+          { "filenamePattern": "*.pyxres" }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "pyxel.player",
+        "displayName": "Pyxel Player",
+        "selector": [
+          { "filenamePattern": "*.pyxapp" }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.7.0"
+  }
+}
