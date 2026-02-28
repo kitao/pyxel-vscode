@@ -177,14 +177,18 @@ async function copyExamples() {
           !f.path.includes("__pycache__")
       );
 
-      // Download and write each file
-      for (const file of files) {
+      // Remove existing directory and download all files in parallel
+      const examplesDir = path.join(targetDir, "pyxel_examples");
+      fs.rmSync(examplesDir, { recursive: true, force: true });
+      fs.mkdirSync(examplesDir, { recursive: true });
+      const downloads = files.map(async (file) => {
         const relPath = file.path.slice(EXAMPLES_PREFIX.length);
         const data = await httpsGet(`${CDN_BASE}/${file.path}`);
-        const filePath = path.join(targetDir, relPath);
+        const filePath = path.join(examplesDir, relPath);
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, data);
-      }
+      });
+      await Promise.all(downloads);
 
       vscode.window.showInformationMessage(
         `Copied ${files.length} example files.`
