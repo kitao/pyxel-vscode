@@ -6,7 +6,7 @@ import * as https from "https";
 const PYXEL_CDN_BASE =
   "https://cdn.jsdelivr.net/gh/kitao/pyxel/wasm";
 
-// Shared Pyxel panel and state
+// Pyxel panel state
 let pyxelPanel: vscode.WebviewPanel | undefined;
 let pyxelMode: "run" | "edit" | "play" | undefined;
 let lastRunDir: string | undefined;
@@ -22,18 +22,13 @@ export function activate(context: vscode.ExtensionContext) {
   const editorOpts = { webviewOptions: { retainContextWhenHidden: true } };
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
-      "pyxel.editor",
-      new PyxelFileProvider(),
-      editorOpts
-    )
-  );
-  context.subscriptions.push(
+      "pyxel.editor", new PyxelFileProvider(), editorOpts
+    ),
     vscode.window.registerCustomEditorProvider(
-      "pyxel.player",
-      new PyxelFileProvider(),
-      editorOpts
+      "pyxel.player", new PyxelFileProvider(), editorOpts
     )
   );
+
   // Auto-reload on file save (run mode only)
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(() => {
@@ -48,13 +43,20 @@ export function deactivate() {
   pyxelPanel?.dispose();
 }
 
-// --- Shared panel management ---
+// --- Panel management ---
 
-function initPyxelPanel(panel: vscode.WebviewPanel) {
-  panel.webview.options = { enableScripts: true };
-  panel.webview.html = getWebviewHtml();
+function ensurePyxelPanel(): vscode.WebviewPanel {
+  if (pyxelPanel) return pyxelPanel;
 
-  panel.webview.onDidReceiveMessage((msg) => {
+  pyxelPanel = vscode.window.createWebviewPanel(
+    "pyxel.view",
+    "Pyxel",
+    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+    { enableScripts: true, retainContextWhenHidden: true }
+  );
+  pyxelPanel.webview.html = getWebviewHtml();
+
+  pyxelPanel.webview.onDidReceiveMessage((msg) => {
     if (msg.command === "ready") {
       if (pyxelMode === "run" && lastRunDir && lastRunScript) {
         sendRunMessage(pyxelPanel!, lastRunDir, lastRunScript);
@@ -72,27 +74,28 @@ function initPyxelPanel(panel: vscode.WebviewPanel) {
     }
   });
 
-  panel.onDidDispose(() => {
+  pyxelPanel.onDidDispose(() => {
     pyxelPanel = undefined;
     pyxelMode = undefined;
   });
-}
 
-function ensurePyxelPanel(): vscode.WebviewPanel {
-  if (pyxelPanel) {
-    return pyxelPanel;
-  }
-  pyxelPanel = vscode.window.createWebviewPanel(
-    "pyxel.view",
-    "Pyxel",
-    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-    { enableScripts: true, retainContextWhenHidden: true }
-  );
-  initPyxelPanel(pyxelPanel);
   return pyxelPanel;
 }
 
-// --- Game runner ---
+function launchInPanel(
+  mode: typeof pyxelMode,
+  title: string,
+  send: (panel: vscode.WebviewPanel) => void
+) {
+  const isNew = !pyxelPanel;
+  pyxelMode = mode;
+  const panel = ensurePyxelPanel();
+  panel.title = title;
+  panel.reveal(vscode.ViewColumn.Beside, true);
+  if (!isNew) send(panel);
+}
+
+// --- Commands ---
 
 function runPyxel() {
   const editor = vscode.window.activeTextEditor;
@@ -100,21 +103,12 @@ function runPyxel() {
     vscode.window.showErrorMessage("Open a .py file to run with Pyxel.");
     return;
   }
-  const scriptPath = editor.document.fileName;
-  lastRunDir = path.dirname(scriptPath);
-  lastRunScript = path.basename(scriptPath);
-
-  const isNew = !pyxelPanel;
-  pyxelMode = "run";
-  const panel = ensurePyxelPanel();
-  panel.title = "Pyxel";
-  panel.reveal(vscode.ViewColumn.Beside, true);
-  if (!isNew) {
-    sendRunMessage(panel, lastRunDir, lastRunScript);
-  }
+  lastRunDir = path.dirname(editor.document.fileName);
+  lastRunScript = path.basename(editor.document.fileName);
+  launchInPanel("run", "Pyxel", (p) =>
+    sendRunMessage(p, lastRunDir!, lastRunScript!)
+  );
 }
-
-// --- New resource ---
 
 async function newResource() {
   const uri = await vscode.window.showSaveDialog({
@@ -122,15 +116,9 @@ async function newResource() {
   });
   if (!uri) return;
   currentEditPath = uri.fsPath;
-
-  const isNew = !pyxelPanel;
-  pyxelMode = "edit";
-  const panel = ensurePyxelPanel();
-  panel.title = path.basename(uri.fsPath);
-  panel.reveal(vscode.ViewColumn.Beside, true);
-  if (!isNew) {
-    sendEditMessage(panel, currentEditPath);
-  }
+  launchInPanel("edit", path.basename(uri.fsPath), (p) =>
+    sendEditMessage(p, currentEditPath!)
+  );
 }
 
 // --- Copy examples ---
@@ -168,7 +156,6 @@ async function copyExamples() {
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: "Copying Pyxel examples..." },
     async () => {
-      // Fetch file tree from GitHub API
       const treeJson = JSON.parse((await httpsGet(GITHUB_TREE_URL)).toString());
       const files: { path: string }[] = treeJson.tree.filter(
         (f: any) =>
@@ -177,18 +164,17 @@ async function copyExamples() {
           !f.path.includes("__pycache__")
       );
 
-      // Remove existing directory and download all files in parallel
       const examplesDir = path.join(targetDir, "pyxel_examples");
       fs.rmSync(examplesDir, { recursive: true, force: true });
       fs.mkdirSync(examplesDir, { recursive: true });
-      const downloads = files.map(async (file) => {
+
+      await Promise.all(files.map(async (file) => {
         const relPath = file.path.slice(EXAMPLES_PREFIX.length);
         const data = await httpsGet(`${CDN_BASE}/${file.path}`);
         const filePath = path.join(examplesDir, relPath);
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, data);
-      });
-      await Promise.all(downloads);
+      }));
 
       vscode.window.showInformationMessage(
         `Copied ${files.length} example files.`
@@ -215,25 +201,15 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
     _token: vscode.CancellationToken
   ): void {
     const filePath = document.uri.fsPath;
-    const ext = path.extname(filePath);
     currentEditPath = filePath;
+    const isEdit = path.extname(filePath) === ".pyxres";
+    launchInPanel(
+      isEdit ? "edit" : "play",
+      path.basename(filePath),
+      (p) => isEdit ? sendEditMessage(p, filePath) : sendPlayMessage(p, filePath)
+    );
 
-    const isNew = !pyxelPanel;
-    const isEdit = ext === ".pyxres";
-    pyxelMode = isEdit ? "edit" : "play";
-
-    const panel = ensurePyxelPanel();
-    panel.title = path.basename(filePath);
-    panel.reveal(vscode.ViewColumn.Beside, true);
-    if (!isNew) {
-      if (isEdit) {
-        sendEditMessage(panel, filePath);
-      } else {
-        sendPlayMessage(panel, filePath);
-      }
-    }
-
-    // Redirect to shared panel — dispose custom editor tab
+    // Redirect to shared panel
     webviewPanel.webview.html = "";
     setTimeout(() => webviewPanel.dispose(), 0);
   }
@@ -287,18 +263,14 @@ function collectFiles(rootDir: string): Record<string, string> {
 // --- Message senders ---
 
 function sendRunMessage(
-  target: vscode.WebviewPanel,
-  rootDir: string,
-  scriptName: string
+  target: vscode.WebviewPanel, rootDir: string, scriptName: string
 ) {
-  const files = collectFiles(rootDir);
-  target.webview.postMessage({ command: "run", scriptName, files });
+  target.webview.postMessage({
+    command: "run", scriptName, files: collectFiles(rootDir),
+  });
 }
 
-function sendEditMessage(
-  target: vscode.WebviewPanel,
-  filePath: string
-) {
+function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {
   const fileName = path.basename(filePath);
   const fileData = fs.existsSync(filePath)
     ? fs.readFileSync(filePath).toString("base64")
@@ -306,10 +278,7 @@ function sendEditMessage(
   target.webview.postMessage({ command: "edit", fileName, fileData });
 }
 
-function sendPlayMessage(
-  target: vscode.WebviewPanel,
-  filePath: string
-) {
+function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
   const fileName = path.basename(filePath);
   const fileData = fs.readFileSync(filePath).toString("base64");
   target.webview.postMessage({ command: "play", fileName, fileData });
@@ -354,17 +323,31 @@ function getWebviewHtml(): string {
   <script src="${PYXEL_CDN_BASE}/pyxel.js"></script>
   <script nonce="${nonce}">
     const vscodeApi = acquireVsCodeApi();
-    let pyxelReady = false;
 
-    // Called from Python after pyxel.save() to sync .pyxres back to VS Code
     window._vscodeNotifySave = function(b64Data) {
       vscodeApi.postMessage({ command: "saved", data: b64Data });
     };
 
+    let pyxelReady = false;
+    let launching = false;
+    let pendingScript = null;
+
     async function executePyxel(script) {
+      if (launching) {
+        pendingScript = script;
+        return;
+      }
       if (!pyxelReady) {
+        launching = true;
         await launchPyxel({ command: "run", script });
         pyxelReady = true;
+        launching = false;
+        if (pendingScript) {
+          const s = pendingScript;
+          pendingScript = null;
+          window.pyxelContext.params.script = s;
+          resetPyxel();
+        }
         return;
       }
       window.pyxelContext.params.script = script;

@@ -1,3 +1,8 @@
+## 0.2.2
+
+- Fixed double launch and resolution issues on mode switching
+- Reuse Pyxel panel for faster reloads
+
 ## 0.2.1
 
 - Fixed Copy Examples to create pyxel_examples subdirectory
