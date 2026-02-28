@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import * as https from "https";
 
 const PYXEL_CDN_BASE =
   "https://cdn.jsdelivr.net/gh/kitao/pyxel/wasm";
@@ -15,7 +16,8 @@ let currentEditPath: string | undefined;
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("pyxel.run", runPyxel),
-    vscode.commands.registerCommand("pyxel.newResource", newResource)
+    vscode.commands.registerCommand("pyxel.newResource", newResource),
+    vscode.commands.registerCommand("pyxel.copyExamples", copyExamples)
   );
   const editorOpts = { webviewOptions: { retainContextWhenHidden: true } };
   context.subscriptions.push(
@@ -129,6 +131,66 @@ async function newResource() {
   if (!isNew) {
     sendEditMessage(panel, currentEditPath);
   }
+}
+
+// --- Copy examples ---
+
+const GITHUB_TREE_URL =
+  "https://api.github.com/repos/kitao/pyxel/git/trees/main?recursive=1";
+const EXAMPLES_PREFIX = "python/pyxel/examples/";
+const CDN_BASE = "https://cdn.jsdelivr.net/gh/kitao/pyxel";
+
+function httpsGet(url: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const opts = { headers: { "User-Agent": "pyxel-vscode" } };
+    https.get(url, opts, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        httpsGet(res.headers.location!).then(resolve, reject);
+        return;
+      }
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
+async function copyExamples() {
+  const folders = await vscode.window.showOpenDialog({
+    canSelectFolders: true,
+    canSelectFiles: false,
+    openLabel: "Copy Examples Here",
+  });
+  if (!folders || folders.length === 0) return;
+  const targetDir = folders[0].fsPath;
+
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: "Copying Pyxel examples..." },
+    async () => {
+      // Fetch file tree from GitHub API
+      const treeJson = JSON.parse((await httpsGet(GITHUB_TREE_URL)).toString());
+      const files: { path: string }[] = treeJson.tree.filter(
+        (f: any) =>
+          f.type === "blob" &&
+          f.path.startsWith(EXAMPLES_PREFIX) &&
+          !f.path.includes("__pycache__")
+      );
+
+      // Download and write each file
+      for (const file of files) {
+        const relPath = file.path.slice(EXAMPLES_PREFIX.length);
+        const data = await httpsGet(`${CDN_BASE}/${file.path}`);
+        const filePath = path.join(targetDir, relPath);
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, data);
+      }
+
+      vscode.window.showInformationMessage(
+        `Copied ${files.length} example files.`
+      );
+    }
+  );
 }
 
 // --- Custom editor provider for .pyxres and .pyxapp ---

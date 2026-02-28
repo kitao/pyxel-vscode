@@ -2,7 +2,7 @@
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
   "description": "Run Pyxel games directly in VS Code — no installation required",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {
@@ -39,6 +39,10 @@
       {
         "command": "pyxel.newResource",
         "title": "Pyxel: New Resource"
+      },
+      {
+        "command": "pyxel.copyExamples",
+        "title": "Pyxel: Copy Examples"
       }
     ],
     "menus": {
