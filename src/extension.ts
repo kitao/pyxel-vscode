@@ -275,7 +275,11 @@ function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {
   const fileData = fs.existsSync(filePath)
     ? fs.readFileSync(filePath).toString("base64")
     : null;
-  target.webview.postMessage({ command: "edit", fileName, fileData });
+  const palPath = filePath.replace(/\.pyxres$/, ".pyxpal");
+  const palData = fs.existsSync(palPath)
+    ? fs.readFileSync(palPath).toString("base64")
+    : null;
+  target.webview.postMessage({ command: "edit", fileName, fileData, palData });
 }
 
 function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
@@ -368,8 +372,9 @@ pyxel.cli.run_python_script('\${scriptName}')
       \`);
     }
 
-    function handleEdit(fileName, fileData) {
+    function handleEdit(fileName, fileData, palData) {
       window._pendingFileData = fileData;
+      window._pendingPalData = palData;
       executePyxel(\`
 import js, base64, pyxel, pyxel.cli
 file_data = js.window._pendingFileData
@@ -377,6 +382,11 @@ if file_data:
     data = base64.b64decode(file_data)
     with open('\${fileName}', 'wb') as f:
         f.write(data)
+pal_data = js.window._pendingPalData
+if pal_data:
+    pal_name = '\${fileName}'.replace('.pyxres', '.pyxpal')
+    with open(pal_name, 'wb') as f:
+        f.write(base64.b64decode(pal_data))
 if not hasattr(pyxel, '_original_save'):
     pyxel._original_save = pyxel.save
 def _save_and_notify(filename):
@@ -405,7 +415,7 @@ pyxel.cli.play_pyxel_app('\${fileName}')
       if (msg.command === "run") {
         handleRun(msg.scriptName, msg.files);
       } else if (msg.command === "edit") {
-        handleEdit(msg.fileName, msg.fileData);
+        handleEdit(msg.fileName, msg.fileData, msg.palData);
       } else if (msg.command === "play") {
         handlePlay(msg.fileName, msg.fileData);
       }

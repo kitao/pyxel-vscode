@@ -1,3 +1,7 @@
+## 0.2.3
+
+- Fixed .pyxpal file not loaded in resource editor
+
 ## 0.2.2
 
 - Fixed double launch and resolution issues on mode switching
