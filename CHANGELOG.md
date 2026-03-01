@@ -1,3 +1,10 @@
+## 0.3.0
+
+- Added Pyxel: Run to editor run button dropdown
+- Added auto-dismiss for click-to-play overlay
+- Removed custom toolbar icon in favor of standard run button
+- Updated README
+
 ## 0.2.3
 
 - Fixed .pyxpal file not loaded in resource editor

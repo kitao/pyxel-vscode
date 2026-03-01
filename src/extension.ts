@@ -321,6 +321,9 @@ function getWebviewHtml(): string {
       overflow: hidden;
       background: #000;
     }
+    #pyxel-prompt {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -331,6 +334,12 @@ function getWebviewHtml(): string {
     window._vscodeNotifySave = function(b64Data) {
       vscodeApi.postMessage({ command: "saved", data: b64Data });
     };
+
+    // Auto-dismiss click-to-play overlay
+    new MutationObserver(() => {
+      const el = document.getElementById("pyxel-prompt");
+      if (el) document.body.click();
+    }).observe(document.body, { childList: true, subtree: true });
 
     let pyxelReady = false;
     let launching = false;

@@ -2,7 +2,7 @@
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
   "description": "Run Pyxel games directly in VS Code — no installation required",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {
@@ -31,10 +31,7 @@
       {
         "command": "pyxel.run",
         "title": "Pyxel: Run",
-        "icon": {
-          "light": "media/pyxel-run-light.svg",
-          "dark": "media/pyxel-run-dark.svg"
-        }
+        "icon": "$(play)"
       },
       {
         "command": "pyxel.newResource",
@@ -46,11 +43,10 @@
       }
     ],
     "menus": {
-      "editor/title": [
+      "editor/title/run": [
         {
           "command": "pyxel.run",
-          "when": "resourceExtname == .py",
-          "group": "navigation"
+          "when": "resourceExtname == .py"
         }
       ]
     },

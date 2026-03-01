@@ -6,13 +6,12 @@ Run games, edit resources, and play apps directly in VS Code — no local Pyxel 
 
 ## Features
 
-- Run `.py` files as Pyxel games (`Pyxel: Run` command or toolbar icon)
-- Edit `.pyxres` resource files in the Pyxel editor
-- Play `.pyxapp` application files
+- Run Python scripts with Pyxel (`Pyxel: Run` command or editor run button)
+- Create new Pyxel resource files (`Pyxel: New Resource`)
 - Copy Pyxel example files to a local folder (`Pyxel: Copy Examples`)
-- Create new `.pyxres` resource files (`Pyxel: New Resource`)
-
-`.pyxres` and `.pyxapp` files open automatically when clicked in the explorer. Saving a file during game execution triggers an auto-reload.
+- Open `.pyxres` files to edit in the Pyxel resource editor
+- Open `.pyxapp` files to play Pyxel applications
+- Auto-reload on file save during execution
 
 ## License
 
