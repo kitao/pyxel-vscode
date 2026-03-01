@@ -17,7 +17,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("pyxel.run", runPyxel),
     vscode.commands.registerCommand("pyxel.newResource", newResource),
-    vscode.commands.registerCommand("pyxel.copyExamples", copyExamples)
+    vscode.commands.registerCommand("pyxel.copyExamples", copyExamples),
+    vscode.commands.registerCommand("pyxel.forwardKey", (args: any) => {
+      pyxelPanel?.webview.postMessage({
+        command: "key", code: args.code, key: args.key, shift: !!args.shift,
+      });
+    })
   );
   const editorOpts = { webviewOptions: { retainContextWhenHidden: true } };
   context.subscriptions.push(
@@ -427,6 +432,18 @@ pyxel.cli.play_pyxel_app('\${fileName}')
         handleEdit(msg.fileName, msg.fileData, msg.palData);
       } else if (msg.command === "play") {
         handlePlay(msg.fileName, msg.fileData);
+      } else if (msg.command === "key") {
+        // Forward keyboard shortcuts from VS Code to Pyxel
+        const fire = (type, code, key, opts) =>
+          document.dispatchEvent(new KeyboardEvent(type, { code, key, bubbles: true, ...opts }));
+        fire("keydown", "ControlLeft", "Control", { ctrlKey: true });
+        if (msg.shift) fire("keydown", "ShiftLeft", "Shift", { ctrlKey: true, shiftKey: true });
+        fire("keydown", msg.code, msg.key, { ctrlKey: true, shiftKey: !!msg.shift });
+        setTimeout(() => {
+          fire("keyup", msg.code, msg.key, {});
+          if (msg.shift) fire("keyup", "ShiftLeft", "Shift", {});
+          fire("keyup", "ControlLeft", "Control", {});
+        }, 80);
       }
     });
 

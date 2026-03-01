@@ -1,3 +1,7 @@
+## 0.4.0
+
+- Added keyboard shortcut forwarding for Pyxel editor (copy, paste, undo, redo, etc.)
+
 ## 0.3.0
 
 - Added Pyxel: Run to editor run button dropdown
