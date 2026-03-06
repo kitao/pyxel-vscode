@@ -1,3 +1,7 @@
+## 0.4.1
+
+- Added error output to Pyxel output channel
+
 ## 0.4.0
 
 - Added keyboard shortcut forwarding for Pyxel editor (copy, paste, undo, redo, etc.)

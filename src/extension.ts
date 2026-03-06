@@ -6,7 +6,8 @@ import * as https from "https";
 const PYXEL_CDN_BASE =
   "https://cdn.jsdelivr.net/gh/kitao/pyxel/wasm";
 
-// Pyxel panel state
+// Pyxel output channel and panel state
+const outputChannel = vscode.window.createOutputChannel("Pyxel");
 let pyxelPanel: vscode.WebviewPanel | undefined;
 let pyxelMode: "run" | "edit" | "play" | undefined;
 let lastRunDir: string | undefined;
@@ -70,6 +71,9 @@ function ensurePyxelPanel(): vscode.WebviewPanel {
       } else if (pyxelMode === "play" && currentEditPath) {
         sendPlayMessage(pyxelPanel!, currentEditPath);
       }
+    } else if (msg.command === "error") {
+      outputChannel.appendLine(msg.message);
+      outputChannel.show(true);
     } else if (msg.command === "saved" && currentEditPath) {
       try {
         fs.writeFileSync(currentEditPath, Buffer.from(msg.data, "base64"));
@@ -335,6 +339,13 @@ function getWebviewHtml(): string {
   <script src="${PYXEL_CDN_BASE}/pyxel.js"></script>
   <script nonce="${nonce}">
     const vscodeApi = acquireVsCodeApi();
+
+    // Forward console.error to VS Code output channel
+    const _origConsoleError = console.error;
+    console.error = (...args) => {
+      _origConsoleError.apply(console, args);
+      vscodeApi.postMessage({ command: "error", message: args.join(" ") });
+    };
 
     window._vscodeNotifySave = function(b64Data) {
       vscodeApi.postMessage({ command: "saved", data: b64Data });
