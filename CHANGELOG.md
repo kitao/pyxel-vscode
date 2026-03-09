@@ -8,10 +8,10 @@
 
 ## 0.3.0
 
-- Added Pyxel: Run to editor run button dropdown
-- Added auto-dismiss for click-to-play overlay
-- Removed custom toolbar icon in favor of standard run button
 - Updated README
+- Removed custom toolbar icon in favor of standard run button
+- Added auto-dismiss for click-to-play overlay
+- Added Pyxel: Run to editor run button dropdown
 
 ## 0.2.3
 
@@ -19,18 +19,18 @@
 
 ## 0.2.2
 
-- Fixed double launch and resolution issues on mode switching
 - Reuse Pyxel panel for faster reloads
+- Fixed double launch and resolution issues on mode switching
 
 ## 0.2.1
 
-- Fixed Copy Examples to create pyxel_examples subdirectory
 - Optimized example downloads to run in parallel
+- Fixed Copy Examples to create pyxel_examples subdirectory
 
 ## 0.2.0
 
-- Added Copy Examples command
 - Updated README
+- Added Copy Examples command
 
 ## 0.1.0
 
