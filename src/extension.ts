@@ -8,11 +8,10 @@ const PYXEL_CDN_BASE =
 
 // Pyxel output channel and panel state
 const outputChannel = vscode.window.createOutputChannel("Pyxel");
-let pyxelPanel: vscode.WebviewPanel | undefined;
-let pyxelMode: "run" | "edit" | "play" | undefined;
+let runPanel: vscode.WebviewPanel | undefined;
 let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
-let currentEditPath: string | undefined;
+let activePyxelWebview: vscode.Webview | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -20,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("pyxel.newResource", newResource),
     vscode.commands.registerCommand("pyxel.copyExamples", copyExamples),
     vscode.commands.registerCommand("pyxel.forwardKey", (args: any) => {
-      pyxelPanel?.webview.postMessage({
+      activePyxelWebview?.postMessage({
         command: "key", code: args.code, key: args.key, shift: !!args.shift,
       });
     })
@@ -38,70 +37,85 @@ export function activate(context: vscode.ExtensionContext) {
   // Auto-reload on file save (run mode only)
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(() => {
-      if (pyxelPanel && pyxelMode === "run" && lastRunDir && lastRunScript) {
-        sendRunMessage(pyxelPanel, lastRunDir, lastRunScript);
+      if (runPanel && lastRunDir && lastRunScript) {
+        sendRunMessage(runPanel, lastRunDir, lastRunScript);
       }
     })
   );
 }
 
 export function deactivate() {
-  pyxelPanel?.dispose();
+  runPanel?.dispose();
 }
 
-// --- Panel management ---
+// --- Panel utilities ---
 
-function ensurePyxelPanel(): vscode.WebviewPanel {
-  if (pyxelPanel) return pyxelPanel;
+function trackPanel(panel: vscode.WebviewPanel) {
+  if (panel.active) activePyxelWebview = panel.webview;
+  panel.onDidChangeViewState(() => {
+    if (panel.active) activePyxelWebview = panel.webview;
+  });
+  panel.onDidDispose(() => {
+    if (activePyxelWebview === panel.webview) {
+      activePyxelWebview = undefined;
+    }
+  });
+}
 
-  pyxelPanel = vscode.window.createWebviewPanel(
+function initPyxelWebview(
+  panel: vscode.WebviewPanel,
+  onReady: () => void,
+  onSaved?: (data: string) => void
+): void {
+  panel.webview.options = { enableScripts: true };
+  panel.webview.html = getWebviewHtml();
+  trackPanel(panel);
+
+  panel.webview.onDidReceiveMessage((msg) => {
+    if (msg.command === "ready") {
+      onReady();
+    } else if (msg.command === "error") {
+      outputChannel.appendLine(msg.message);
+      outputChannel.show(true);
+    } else if (msg.command === "saved" && onSaved) {
+      onSaved(msg.data);
+    }
+  });
+}
+
+function saveHandler(filePath: string): (data: string) => void {
+  return (data) => {
+    try {
+      fs.writeFileSync(filePath, Buffer.from(data, "base64"));
+    } catch (e: any) {
+      vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
+    }
+  };
+}
+
+// --- Run panel management ---
+
+function ensureRunPanel(): vscode.WebviewPanel {
+  if (runPanel) return runPanel;
+
+  runPanel = vscode.window.createWebviewPanel(
     "pyxel.view",
     "Pyxel",
     { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
     { enableScripts: true, retainContextWhenHidden: true }
   );
-  pyxelPanel.webview.html = getWebviewHtml();
 
-  pyxelPanel.webview.onDidReceiveMessage((msg) => {
-    if (msg.command === "ready") {
-      if (pyxelMode === "run" && lastRunDir && lastRunScript) {
-        sendRunMessage(pyxelPanel!, lastRunDir, lastRunScript);
-      } else if (pyxelMode === "edit" && currentEditPath) {
-        sendEditMessage(pyxelPanel!, currentEditPath);
-      } else if (pyxelMode === "play" && currentEditPath) {
-        sendPlayMessage(pyxelPanel!, currentEditPath);
-      }
-    } else if (msg.command === "error") {
-      outputChannel.appendLine(msg.message);
-      outputChannel.show(true);
-    } else if (msg.command === "saved" && currentEditPath) {
-      try {
-        fs.writeFileSync(currentEditPath, Buffer.from(msg.data, "base64"));
-      } catch (e: any) {
-        vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
-      }
+  initPyxelWebview(runPanel, () => {
+    if (lastRunDir && lastRunScript) {
+      sendRunMessage(runPanel!, lastRunDir, lastRunScript);
     }
   });
 
-  pyxelPanel.onDidDispose(() => {
-    pyxelPanel = undefined;
-    pyxelMode = undefined;
+  runPanel.onDidDispose(() => {
+    runPanel = undefined;
   });
 
-  return pyxelPanel;
-}
-
-function launchInPanel(
-  mode: typeof pyxelMode,
-  title: string,
-  send: (panel: vscode.WebviewPanel) => void
-) {
-  const isNew = !pyxelPanel;
-  pyxelMode = mode;
-  const panel = ensurePyxelPanel();
-  panel.title = title;
-  panel.reveal(vscode.ViewColumn.Beside, true);
-  if (!isNew) send(panel);
+  return runPanel;
 }
 
 // --- Commands ---
@@ -114,9 +128,11 @@ function runPyxel() {
   }
   lastRunDir = path.dirname(editor.document.fileName);
   lastRunScript = path.basename(editor.document.fileName);
-  launchInPanel("run", "Pyxel", (p) =>
-    sendRunMessage(p, lastRunDir!, lastRunScript!)
-  );
+  const isNew = !runPanel;
+  const panel = ensureRunPanel();
+  panel.title = "Pyxel";
+  panel.reveal(vscode.ViewColumn.Beside, true);
+  if (!isNew) sendRunMessage(panel, lastRunDir, lastRunScript);
 }
 
 async function newResource() {
@@ -124,9 +140,19 @@ async function newResource() {
     filters: { "Pyxel Resource": ["pyxres"] },
   });
   if (!uri) return;
-  currentEditPath = uri.fsPath;
-  launchInPanel("edit", path.basename(uri.fsPath), (p) =>
-    sendEditMessage(p, currentEditPath!)
+
+  const filePath = uri.fsPath;
+  const panel = vscode.window.createWebviewPanel(
+    "pyxel.view",
+    path.basename(filePath),
+    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+    { enableScripts: true, retainContextWhenHidden: true }
+  );
+
+  initPyxelWebview(
+    panel,
+    () => sendEditMessage(panel, filePath),
+    saveHandler(filePath)
   );
 }
 
@@ -210,17 +236,16 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
     _token: vscode.CancellationToken
   ): void {
     const filePath = document.uri.fsPath;
-    currentEditPath = filePath;
     const isEdit = path.extname(filePath) === ".pyxres";
-    launchInPanel(
-      isEdit ? "edit" : "play",
-      path.basename(filePath),
-      (p) => isEdit ? sendEditMessage(p, filePath) : sendPlayMessage(p, filePath)
-    );
 
-    // Redirect to shared panel
-    webviewPanel.webview.html = "";
-    setTimeout(() => webviewPanel.dispose(), 0);
+    initPyxelWebview(
+      webviewPanel,
+      () => {
+        if (isEdit) sendEditMessage(webviewPanel, filePath);
+        else sendPlayMessage(webviewPanel, filePath);
+      },
+      isEdit ? saveHandler(filePath) : undefined
+    );
   }
 }
 

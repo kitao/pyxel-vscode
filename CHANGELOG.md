@@ -1,3 +1,7 @@
+## 0.5.0
+
+- Open .pyxres/.pyxapp files in-place instead of splitting the view
+
 ## 0.4.1
 
 - Added error output to Pyxel output channel
