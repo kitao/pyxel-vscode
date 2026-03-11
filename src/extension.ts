@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as https from "https";
 
 const PYXEL_CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/kitao/pyxel/wasm";
+  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.2/wasm";
 
 // Pyxel output channel and panel state
 const outputChannel = vscode.window.createOutputChannel("Pyxel");

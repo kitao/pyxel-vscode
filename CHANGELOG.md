@@ -1,3 +1,7 @@
+## 0.5.1
+
+- Pin Pyxel WASM runtime to v2.8.2
+
 ## 0.5.0
 
 - Open .pyxres/.pyxapp files in-place instead of splitting the view
