@@ -1,3 +1,11 @@
+## 0.6.0
+
+- Add API Reference command to open Pyxel API docs
+- Show Pyxel app title in the panel tab
+- Open New Resource in the active tab group
+- Add Pyxel: Run to explorer context menu for .py files
+- Fix run panel splitting again when re-running
+
 ## 0.5.1
 
 - Pin Pyxel WASM runtime to v2.8.2

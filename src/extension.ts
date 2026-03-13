@@ -5,10 +5,13 @@ import * as https from "https";
 
 const PYXEL_CDN_BASE =
   "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.2/wasm";
+const PYXEL_API_REFERENCE_URL =
+  "https://kitao.github.io/pyxel/wasm/api-reference/";
 
 // Pyxel output channel and panel state
 const outputChannel = vscode.window.createOutputChannel("Pyxel");
 let runPanel: vscode.WebviewPanel | undefined;
+let apiRefPanel: vscode.WebviewPanel | undefined;
 let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
 let activePyxelWebview: vscode.Webview | undefined;
@@ -18,6 +21,28 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("pyxel.run", runPyxel),
     vscode.commands.registerCommand("pyxel.newResource", newResource),
     vscode.commands.registerCommand("pyxel.copyExamples", copyExamples),
+    vscode.commands.registerCommand("pyxel.apiReference", () => {
+      if (apiRefPanel) {
+        apiRefPanel.reveal();
+        return;
+      }
+      apiRefPanel = vscode.window.createWebviewPanel(
+        "pyxel.apiReference",
+        "Pyxel API Reference",
+        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+        { enableScripts: true }
+      );
+      apiRefPanel.webview.html = `<!doctype html>
+<html><head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; frame-src https://kitao.github.io; style-src 'unsafe-inline';">
+<style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;overflow:hidden;display:block;}</style>
+</head><body>
+<iframe src="${PYXEL_API_REFERENCE_URL}"></iframe>
+</body></html>`;
+      apiRefPanel.onDidDispose(() => { apiRefPanel = undefined; });
+    }),
     vscode.commands.registerCommand("pyxel.forwardKey", (args: any) => {
       activePyxelWebview?.postMessage({
         command: "key", code: args.code, key: args.key, shift: !!args.shift,
@@ -74,6 +99,8 @@ function initPyxelWebview(
   panel.webview.onDidReceiveMessage((msg) => {
     if (msg.command === "ready") {
       onReady();
+    } else if (msg.command === "title") {
+      panel.title = msg.title;
     } else if (msg.command === "error") {
       outputChannel.appendLine(msg.message);
       outputChannel.show(true);
@@ -120,18 +147,24 @@ function ensureRunPanel(): vscode.WebviewPanel {
 
 // --- Commands ---
 
-function runPyxel() {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || !editor.document.fileName.endsWith(".py")) {
+function runPyxel(uri?: vscode.Uri) {
+  let filePath: string | undefined;
+  if (uri) {
+    filePath = uri.fsPath;
+  } else {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) filePath = editor.document.fileName;
+  }
+  if (!filePath || !filePath.endsWith(".py")) {
     vscode.window.showErrorMessage("Open a .py file to run with Pyxel.");
     return;
   }
-  lastRunDir = path.dirname(editor.document.fileName);
-  lastRunScript = path.basename(editor.document.fileName);
+  lastRunDir = path.dirname(filePath);
+  lastRunScript = path.basename(filePath);
   const isNew = !runPanel;
   const panel = ensureRunPanel();
   panel.title = "Pyxel";
-  panel.reveal(vscode.ViewColumn.Beside, true);
+  panel.reveal(isNew ? vscode.ViewColumn.Beside : undefined, true);
   if (!isNew) sendRunMessage(panel, lastRunDir, lastRunScript);
 }
 
@@ -140,20 +173,7 @@ async function newResource() {
     filters: { "Pyxel Resource": ["pyxres"] },
   });
   if (!uri) return;
-
-  const filePath = uri.fsPath;
-  const panel = vscode.window.createWebviewPanel(
-    "pyxel.view",
-    path.basename(filePath),
-    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-    { enableScripts: true, retainContextWhenHidden: true }
-  );
-
-  initPyxelWebview(
-    panel,
-    () => sendEditMessage(panel, filePath),
-    saveHandler(filePath)
-  );
+  await vscode.commands.executeCommand("vscode.open", uri);
 }
 
 // --- Copy examples ---
@@ -481,6 +501,15 @@ pyxel.cli.play_pyxel_app('\${fileName}')
           fire("keyup", "ControlLeft", "Control", {});
         }, 80);
       }
+    });
+
+    // Watch for document.title changes (set by pyxel.init title parameter)
+    new MutationObserver(() => {
+      if (document.title) {
+        vscodeApi.postMessage({ command: "title", title: document.title });
+      }
+    }).observe(document.querySelector("title") || document.head, {
+      childList: true, subtree: true, characterData: true,
     });
 
     vscodeApi.postMessage({ command: "ready" });
