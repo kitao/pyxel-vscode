@@ -4,14 +4,17 @@ import * as fs from "fs";
 import * as https from "https";
 
 const PYXEL_CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.2/wasm";
+  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.3/wasm";
 const PYXEL_API_REFERENCE_URL =
   "https://kitao.github.io/pyxel/wasm/api-reference/";
+const PYXEL_EDITOR_MANUAL_URL =
+  "https://kitao.github.io/pyxel/wasm/editor-manual/";
 
 // Pyxel output channel and panel state
 const outputChannel = vscode.window.createOutputChannel("Pyxel");
 let runPanel: vscode.WebviewPanel | undefined;
 let apiRefPanel: vscode.WebviewPanel | undefined;
+let editorManualPanel: vscode.WebviewPanel | undefined;
 let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
 let activePyxelWebview: vscode.Webview | undefined;
@@ -42,6 +45,28 @@ export function activate(context: vscode.ExtensionContext) {
 <iframe src="${PYXEL_API_REFERENCE_URL}"></iframe>
 </body></html>`;
       apiRefPanel.onDidDispose(() => { apiRefPanel = undefined; });
+    }),
+    vscode.commands.registerCommand("pyxel.editorManual", () => {
+      if (editorManualPanel) {
+        editorManualPanel.reveal();
+        return;
+      }
+      editorManualPanel = vscode.window.createWebviewPanel(
+        "pyxel.editorManual",
+        "Pyxel Editor Manual",
+        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+        { enableScripts: true }
+      );
+      editorManualPanel.webview.html = `<!doctype html>
+<html><head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; frame-src https://kitao.github.io; style-src 'unsafe-inline';">
+<style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;overflow:hidden;display:block;}</style>
+</head><body>
+<iframe src="${PYXEL_EDITOR_MANUAL_URL}"></iframe>
+</body></html>`;
+      editorManualPanel.onDidDispose(() => { editorManualPanel = undefined; });
     }),
     vscode.commands.registerCommand("pyxel.forwardKey", (args: any) => {
       activePyxelWebview?.postMessage({

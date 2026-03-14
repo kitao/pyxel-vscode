@@ -1,3 +1,8 @@
+## 0.6.1
+
+- Update Pyxel WASM runtime to v2.8.3
+- Add Editor Manual command to open Pyxel Editor docs
+
 ## 0.6.0
 
 - Add API Reference command to open Pyxel API docs
@@ -20,7 +25,7 @@
 
 ## 0.4.0
 
-- Added keyboard shortcut forwarding for Pyxel editor (copy, paste, undo, redo, etc.)
+- Added keyboard shortcut forwarding for Pyxel Editor (copy, paste, undo, redo, etc.)
 
 ## 0.3.0
 
