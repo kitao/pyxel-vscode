@@ -4,11 +4,11 @@ import * as fs from "fs";
 import * as https from "https";
 
 const PYXEL_CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.3/wasm";
+  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.4/wasm";
 const PYXEL_API_REFERENCE_URL =
-  "https://kitao.github.io/pyxel/wasm/api-reference/";
+  "https://kitao.github.io/pyxel/web/api-reference/";
 const PYXEL_EDITOR_MANUAL_URL =
-  "https://kitao.github.io/pyxel/wasm/editor-manual/";
+  "https://kitao.github.io/pyxel/web/editor-manual/";
 
 // Pyxel output channel and panel state
 const outputChannel = vscode.window.createOutputChannel("Pyxel");

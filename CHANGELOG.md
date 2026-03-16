@@ -1,3 +1,8 @@
+## 0.6.2
+
+- Update Pyxel WASM runtime to v2.8.4
+- Update API Reference and Editor Manual URLs
+
 ## 0.6.1
 
 - Update Pyxel WASM runtime to v2.8.3
