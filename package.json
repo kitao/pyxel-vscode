@@ -108,5 +108,15 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.0.0",
     "typescript": "^5.7.0"
+  },
+  "configuration": {
+    "title": "Pyxel",
+    "properties": {
+      "pyxel.packages": {
+        "type": "string",
+        "default": "",
+        "description": "Comma-separated list of packages to load when running Pyxel (e.g. 'numpy,pandas')"
+      }
+    }
   }
 }

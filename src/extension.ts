@@ -344,8 +344,11 @@ function collectFiles(rootDir: string): Record<string, string> {
 function sendRunMessage(
   target: vscode.WebviewPanel, rootDir: string, scriptName: string
 ) {
+  const config = vscode.workspace.getConfiguration("pyxel");
+  const packages = config.get<string>("packages", "").trim();
   target.webview.postMessage({
     command: "run", scriptName, files: collectFiles(rootDir),
+    ...(packages ? { packages } : {}),
   });
 }
 
@@ -431,14 +434,16 @@ function getWebviewHtml(): string {
     let launching = false;
     let pendingScript = null;
 
-    async function executePyxel(script) {
+    async function executePyxel(script, packages) {
       if (launching) {
         pendingScript = script;
         return;
       }
       if (!pyxelReady) {
         launching = true;
-        await launchPyxel({ command: "run", script });
+        const launchOpts = { command: "run", script };
+        if (packages) launchOpts.packages = packages;
+        await launchPyxel(launchOpts);
         pyxelReady = true;
         launching = false;
         if (pendingScript) {
@@ -453,7 +458,7 @@ function getWebviewHtml(): string {
       resetPyxel();
     }
 
-    function handleRun(scriptName, files) {
+    function handleRun(scriptName, files, packages) {
       window._pendingFiles = files;
       executePyxel(\`
 import js, base64, pyxel.cli, os
@@ -464,7 +469,7 @@ for name, b64 in files.items():
     with open(name, 'wb') as f:
         f.write(base64.b64decode(b64))
 pyxel.cli.run_python_script('\${scriptName}')
-      \`);
+      \`, packages);
     }
 
     function handleEdit(fileName, fileData, palData) {
@@ -508,7 +513,7 @@ pyxel.cli.play_pyxel_app('\${fileName}')
     window.addEventListener("message", (event) => {
       const msg = event.data;
       if (msg.command === "run") {
-        handleRun(msg.scriptName, msg.files);
+        handleRun(msg.scriptName, msg.files, msg.packages);
       } else if (msg.command === "edit") {
         handleEdit(msg.fileName, msg.fileData, msg.palData);
       } else if (msg.command === "play") {
