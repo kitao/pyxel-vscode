@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as https from "https";
 
 const PYXEL_CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.5/wasm";
+  "https://cdn.jsdelivr.net/gh/kitao/pyxel@v2.8.6/wasm";
 const PYXEL_API_REFERENCE_URL =
   "https://kitao.github.io/pyxel/web/api-reference/";
 const PYXEL_EDITOR_MANUAL_URL =

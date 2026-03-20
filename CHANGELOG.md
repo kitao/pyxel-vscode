@@ -1,3 +1,7 @@
+## 0.6.4
+
+- Update Pyxel WASM runtime to v2.8.6
+
 ## 0.6.3
 
 - Update Pyxel WASM runtime to v2.8.5
