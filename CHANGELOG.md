@@ -1,3 +1,7 @@
+## 0.6.5
+
+- Use latest Pyxel WASM runtime from main branch
+
 ## 0.6.4
 
 - Update Pyxel WASM runtime to v2.8.6
