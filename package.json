@@ -2,7 +2,7 @@
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
   "description": "Run Pyxel games directly in VS Code — no installation required",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {

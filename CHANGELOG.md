@@ -1,3 +1,10 @@
+## 0.6.6
+
+- Use cryptographic nonce for webview security
+- Escape filenames in embedded Python to prevent injection
+- Add HTTP error handling for Copy Examples command
+- Deduplicate iframe panel creation code
+
 ## 0.6.5
 
 - Use latest Pyxel WASM runtime from main branch
@@ -38,37 +45,37 @@
 
 ## 0.4.1
 
-- Added error output to Pyxel output channel
+- Add error output to Pyxel output channel
 
 ## 0.4.0
 
-- Added keyboard shortcut forwarding for Pyxel Editor (copy, paste, undo, redo, etc.)
+- Add keyboard shortcut forwarding for Pyxel Editor (copy, paste, undo, redo, etc.)
 
 ## 0.3.0
 
-- Updated README
-- Removed custom toolbar icon in favor of standard run button
-- Added auto-dismiss for click-to-play overlay
-- Added Pyxel: Run to editor run button dropdown
+- Update README
+- Remove custom toolbar icon in favor of standard run button
+- Add auto-dismiss for click-to-play overlay
+- Add Pyxel: Run to editor run button dropdown
 
 ## 0.2.3
 
-- Fixed .pyxpal file not loaded in resource editor
+- Fix .pyxpal file not loaded in resource editor
 
 ## 0.2.2
 
 - Reuse Pyxel panel for faster reloads
-- Fixed double launch and resolution issues on mode switching
+- Fix double launch and resolution issues on mode switching
 
 ## 0.2.1
 
-- Optimized example downloads to run in parallel
-- Fixed Copy Examples to create pyxel_examples subdirectory
+- Optimize example downloads to run in parallel
+- Fix Copy Examples to create pyxel_examples subdirectory
 
 ## 0.2.0
 
-- Updated README
-- Added Copy Examples command
+- Update README
+- Add Copy Examples command
 
 ## 0.1.0
 

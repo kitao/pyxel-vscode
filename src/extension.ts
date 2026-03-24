@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as crypto from "crypto";
 import * as path from "path";
 import * as fs from "fs";
 import * as https from "https";
@@ -10,64 +11,29 @@ const PYXEL_API_REFERENCE_URL =
 const PYXEL_EDITOR_MANUAL_URL =
   "https://kitao.github.io/pyxel/web/editor-manual/";
 
-// Pyxel output channel and panel state
-const outputChannel = vscode.window.createOutputChannel("Pyxel");
+// Mutable state
+let outputChannel: vscode.OutputChannel;
 let runPanel: vscode.WebviewPanel | undefined;
-let apiRefPanel: vscode.WebviewPanel | undefined;
-let editorManualPanel: vscode.WebviewPanel | undefined;
 let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
 let activePyxelWebview: vscode.Webview | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+  outputChannel = vscode.window.createOutputChannel("Pyxel");
+
   context.subscriptions.push(
+    outputChannel,
     vscode.commands.registerCommand("pyxel.run", runPyxel),
     vscode.commands.registerCommand("pyxel.newResource", newResource),
     vscode.commands.registerCommand("pyxel.copyExamples", copyExamples),
-    vscode.commands.registerCommand("pyxel.apiReference", () => {
-      if (apiRefPanel) {
-        apiRefPanel.reveal();
-        return;
-      }
-      apiRefPanel = vscode.window.createWebviewPanel(
-        "pyxel.apiReference",
-        "Pyxel API Reference",
-        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-        { enableScripts: true }
-      );
-      apiRefPanel.webview.html = `<!doctype html>
-<html><head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; frame-src https://kitao.github.io; style-src 'unsafe-inline';">
-<style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;overflow:hidden;display:block;}</style>
-</head><body>
-<iframe src="${PYXEL_API_REFERENCE_URL}"></iframe>
-</body></html>`;
-      apiRefPanel.onDidDispose(() => { apiRefPanel = undefined; });
-    }),
-    vscode.commands.registerCommand("pyxel.editorManual", () => {
-      if (editorManualPanel) {
-        editorManualPanel.reveal();
-        return;
-      }
-      editorManualPanel = vscode.window.createWebviewPanel(
-        "pyxel.editorManual",
-        "Pyxel Editor Manual",
-        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-        { enableScripts: true }
-      );
-      editorManualPanel.webview.html = `<!doctype html>
-<html><head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; frame-src https://kitao.github.io; style-src 'unsafe-inline';">
-<style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;overflow:hidden;display:block;}</style>
-</head><body>
-<iframe src="${PYXEL_EDITOR_MANUAL_URL}"></iframe>
-</body></html>`;
-      editorManualPanel.onDidDispose(() => { editorManualPanel = undefined; });
-    }),
+    vscode.commands.registerCommand(
+      "pyxel.apiReference",
+      createIframeCommand("pyxel.apiReference", "Pyxel API Reference", PYXEL_API_REFERENCE_URL)
+    ),
+    vscode.commands.registerCommand(
+      "pyxel.editorManual",
+      createIframeCommand("pyxel.editorManual", "Pyxel Editor Manual", PYXEL_EDITOR_MANUAL_URL)
+    ),
     vscode.commands.registerCommand("pyxel.forwardKey", (args: any) => {
       activePyxelWebview?.postMessage({
         command: "key", code: args.code, key: args.key, shift: !!args.shift,
@@ -96,6 +62,32 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   runPanel?.dispose();
+}
+
+// --- Iframe panel factory ---
+
+function createIframeCommand(
+  viewType: string, title: string, url: string
+): () => void {
+  let panel: vscode.WebviewPanel | undefined;
+  return () => {
+    if (panel) { panel.reveal(); return; }
+    panel = vscode.window.createWebviewPanel(
+      viewType, title,
+      { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+      { enableScripts: true }
+    );
+    panel.webview.html = `<!doctype html>
+<html><head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; frame-src https://kitao.github.io; style-src 'unsafe-inline';">
+<style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;overflow:hidden;display:block;}</style>
+</head><body>
+<iframe src="${url}"></iframe>
+</body></html>`;
+    panel.onDidDispose(() => { panel = undefined; });
+  };
 }
 
 // --- Panel utilities ---
@@ -216,6 +208,11 @@ function httpsGet(url: string): Promise<Buffer> {
         httpsGet(res.headers.location!).then(resolve, reject);
         return;
       }
+      if (!res.statusCode || res.statusCode >= 400) {
+        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        res.resume();
+        return;
+      }
       const chunks: Buffer[] = [];
       res.on("data", (chunk) => chunks.push(chunk));
       res.on("end", () => resolve(Buffer.concat(chunks)));
@@ -236,29 +233,35 @@ async function copyExamples() {
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: "Copying Pyxel examples..." },
     async () => {
-      const treeJson = JSON.parse((await httpsGet(GITHUB_TREE_URL)).toString());
-      const files: { path: string }[] = treeJson.tree.filter(
-        (f: any) =>
-          f.type === "blob" &&
-          f.path.startsWith(EXAMPLES_PREFIX) &&
-          !f.path.includes("__pycache__")
-      );
+      try {
+        const treeJson = JSON.parse((await httpsGet(GITHUB_TREE_URL)).toString());
+        const files: { path: string }[] = treeJson.tree.filter(
+          (f: any) =>
+            f.type === "blob" &&
+            f.path.startsWith(EXAMPLES_PREFIX) &&
+            !f.path.includes("__pycache__")
+        );
 
-      const examplesDir = path.join(targetDir, "pyxel_examples");
-      fs.rmSync(examplesDir, { recursive: true, force: true });
-      fs.mkdirSync(examplesDir, { recursive: true });
+        const examplesDir = path.join(targetDir, "pyxel_examples");
+        fs.rmSync(examplesDir, { recursive: true, force: true });
+        fs.mkdirSync(examplesDir, { recursive: true });
 
-      await Promise.all(files.map(async (file) => {
-        const relPath = file.path.slice(EXAMPLES_PREFIX.length);
-        const data = await httpsGet(`${CDN_BASE}/${file.path}`);
-        const filePath = path.join(examplesDir, relPath);
-        fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        fs.writeFileSync(filePath, data);
-      }));
+        await Promise.all(files.map(async (file) => {
+          const relPath = file.path.slice(EXAMPLES_PREFIX.length);
+          const data = await httpsGet(`${CDN_BASE}/${file.path}`);
+          const filePath = path.join(examplesDir, relPath);
+          fs.mkdirSync(path.dirname(filePath), { recursive: true });
+          fs.writeFileSync(filePath, data);
+        }));
 
-      vscode.window.showInformationMessage(
-        `Copied ${files.length} example files.`
-      );
+        vscode.window.showInformationMessage(
+          `Copied ${files.length} example files.`
+        );
+      } catch (e: any) {
+        vscode.window.showErrorMessage(
+          `Failed to copy examples: ${e.message}`
+        );
+      }
     }
   );
 }
@@ -370,13 +373,7 @@ function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
 // --- WebView HTML ---
 
 function getNonce(): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let nonce = "";
-  for (let i = 0; i < 32; i++) {
-    nonce += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return nonce;
+  return crypto.randomBytes(16).toString("hex");
 }
 
 function getWebviewHtml(): string {
@@ -453,8 +450,14 @@ function getWebviewHtml(): string {
       resetPyxel();
     }
 
+    // Escape string for embedding in Python single-quoted literals
+    function pyEsc(s) {
+      return s.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'");
+    }
+
     function handleRun(scriptName, files) {
       window._pendingFiles = files;
+      const name = pyEsc(scriptName);
       executePyxel(\`
 import js, base64, pyxel.cli, os
 files = js.window._pendingFiles.to_py()
@@ -463,23 +466,24 @@ for name, b64 in files.items():
         os.makedirs(os.path.dirname(name), exist_ok=True)
     with open(name, 'wb') as f:
         f.write(base64.b64decode(b64))
-pyxel.cli.run_python_script('\${scriptName}')
+pyxel.cli.run_python_script('\${name}')
       \`);
     }
 
     function handleEdit(fileName, fileData, palData) {
       window._pendingFileData = fileData;
       window._pendingPalData = palData;
+      const name = pyEsc(fileName);
       executePyxel(\`
 import js, base64, pyxel, pyxel.cli
 file_data = js.window._pendingFileData
 if file_data:
     data = base64.b64decode(file_data)
-    with open('\${fileName}', 'wb') as f:
+    with open('\${name}', 'wb') as f:
         f.write(data)
 pal_data = js.window._pendingPalData
 if pal_data:
-    pal_name = '\${fileName}'.replace('.pyxres', '.pyxpal')
+    pal_name = '\${name}'.replace('.pyxres', '.pyxpal')
     with open(pal_name, 'wb') as f:
         f.write(base64.b64decode(pal_data))
 if not hasattr(pyxel, '_original_save'):
@@ -490,18 +494,19 @@ def _save_and_notify(filename):
         b64 = base64.b64encode(f.read()).decode('ascii')
     js.window._vscodeNotifySave(b64)
 pyxel.save = _save_and_notify
-pyxel.cli.edit_pyxel_resource('\${fileName}')
+pyxel.cli.edit_pyxel_resource('\${name}')
       \`);
     }
 
     function handlePlay(fileName, fileData) {
       window._pendingFileData = fileData;
+      const name = pyEsc(fileName);
       executePyxel(\`
 import js, base64, pyxel.cli
 data = base64.b64decode(js.window._pendingFileData)
-with open('\${fileName}', 'wb') as f:
+with open('\${name}', 'wb') as f:
     f.write(data)
-pyxel.cli.play_pyxel_app('\${fileName}')
+pyxel.cli.play_pyxel_app('\${name}')
       \`);
     }
 
