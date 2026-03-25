@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPyxelRunnable } from "../utils";
+import { isPyxelRunnable, getNonce } from "../utils";
 
 describe("isPyxelRunnable", () => {
   it("accepts a .py file path", () => {
@@ -24,5 +24,18 @@ describe("isPyxelRunnable", () => {
 
   it("accepts .py with spaces in path", () => {
     expect(isPyxelRunnable("/my path/game file.py")).toBe(true);
+  });
+});
+
+describe("getNonce", () => {
+  it("returns a 32-character hex string", () => {
+    const nonce = getNonce();
+    expect(nonce).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("returns different values on successive calls", () => {
+    const a = getNonce();
+    const b = getNonce();
+    expect(a).not.toBe(b);
   });
 });

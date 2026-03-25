@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
-import * as crypto from "crypto";
 import * as path from "path";
 import * as fs from "fs";
 import * as https from "https";
 import {
   PYXEL_CDN_BASE, PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL,
   SKIP_DIRS, MAX_FILE_SIZE, MAX_TOTAL_SIZE, MAX_DEPTH,
-  isPyxelRunnable,
+  isPyxelRunnable, getNonce,
 } from "./utils";
 
 // Mutable state
@@ -363,10 +362,6 @@ function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
 }
 
 // --- WebView HTML ---
-
-function getNonce(): string {
-  return crypto.randomBytes(16).toString("hex");
-}
 
 function getWebviewHtml(): string {
   const nonce = getNonce();

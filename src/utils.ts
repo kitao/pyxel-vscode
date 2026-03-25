@@ -1,3 +1,5 @@
+import * as crypto from "crypto";
+
 export const PYXEL_CDN_BASE =
   "https://cdn.jsdelivr.net/gh/kitao/pyxel@main/wasm";
 export const PYXEL_API_REFERENCE_URL =
@@ -14,4 +16,8 @@ export const MAX_DEPTH = 3;
 
 export function isPyxelRunnable(filePath: string | undefined): filePath is string {
   return !!filePath && filePath.endsWith(".py");
+}
+
+export function getNonce(): string {
+  return crypto.randomBytes(16).toString("hex");
 }
