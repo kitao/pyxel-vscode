@@ -3,13 +3,11 @@ import * as crypto from "crypto";
 import * as path from "path";
 import * as fs from "fs";
 import * as https from "https";
-
-const PYXEL_CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/kitao/pyxel@main/wasm";
-const PYXEL_API_REFERENCE_URL =
-  "https://kitao.github.io/pyxel/web/api-reference/";
-const PYXEL_EDITOR_MANUAL_URL =
-  "https://kitao.github.io/pyxel/web/editor-manual/";
+import {
+  PYXEL_CDN_BASE, PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL,
+  SKIP_DIRS, MAX_FILE_SIZE, MAX_TOTAL_SIZE, MAX_DEPTH,
+  isPyxelRunnable,
+} from "./utils";
 
 // Mutable state
 let outputChannel: vscode.OutputChannel;
@@ -172,7 +170,7 @@ function runPyxel(uri?: vscode.Uri) {
     const editor = vscode.window.activeTextEditor;
     if (editor) filePath = editor.document.fileName;
   }
-  if (!filePath || !filePath.endsWith(".py")) {
+  if (!isPyxelRunnable(filePath)) {
     vscode.window.showErrorMessage("Open a .py file to run with Pyxel.");
     return;
   }
@@ -299,12 +297,6 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
 
 // --- File collection ---
 
-const SKIP_DIRS = new Set([
-  ".git", "__pycache__", "node_modules", ".venv", "venv", ".tox", ".mypy_cache",
-]);
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_TOTAL_SIZE = 20 * 1024 * 1024;
-const MAX_DEPTH = 3;
 
 function collectFiles(rootDir: string): Record<string, string> {
   const files: Record<string, string> = {};
