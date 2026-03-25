@@ -1,3 +1,7 @@
+## 0.6.7
+
+- Extract pure logic into utils.ts and add unit tests with vitest
+
 ## 0.6.6
 
 - Use cryptographic nonce for webview security
