@@ -66,25 +66,138 @@
       ]
     },
     "keybindings": [
-      { "key": "ctrl+s", "mac": "cmd+s", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyS", "key": "s" } },
-      { "key": "ctrl+z", "mac": "cmd+z", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyZ", "key": "z" } },
-      { "key": "ctrl+y", "mac": "cmd+y", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyY", "key": "y" } },
-      { "key": "ctrl+c", "mac": "cmd+c", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyC", "key": "c" } },
-      { "key": "ctrl+x", "mac": "cmd+x", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyX", "key": "x" } },
-      { "key": "ctrl+v", "mac": "cmd+v", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyV", "key": "v" } },
-      { "key": "ctrl+a", "mac": "cmd+a", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyA", "key": "a" } },
-      { "key": "ctrl+u", "mac": "cmd+u", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyU", "key": "u" } },
-      { "key": "ctrl+d", "mac": "cmd+d", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyD", "key": "d" } },
-      { "key": "ctrl+shift+c", "mac": "cmd+shift+c", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyC", "key": "c", "shift": true } },
-      { "key": "ctrl+shift+x", "mac": "cmd+shift+x", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyX", "key": "x", "shift": true } },
-      { "key": "ctrl+shift+v", "mac": "cmd+shift+v", "command": "pyxel.forwardKey", "when": "activeWebviewPanelId =~ /^pyxel\\./", "args": { "code": "KeyV", "key": "v", "shift": true } }
+      {
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyS",
+          "key": "s"
+        }
+      },
+      {
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyZ",
+          "key": "z"
+        }
+      },
+      {
+        "key": "ctrl+y",
+        "mac": "cmd+y",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyY",
+          "key": "y"
+        }
+      },
+      {
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyC",
+          "key": "c"
+        }
+      },
+      {
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyX",
+          "key": "x"
+        }
+      },
+      {
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyV",
+          "key": "v"
+        }
+      },
+      {
+        "key": "ctrl+a",
+        "mac": "cmd+a",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyA",
+          "key": "a"
+        }
+      },
+      {
+        "key": "ctrl+u",
+        "mac": "cmd+u",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyU",
+          "key": "u"
+        }
+      },
+      {
+        "key": "ctrl+d",
+        "mac": "cmd+d",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyD",
+          "key": "d"
+        }
+      },
+      {
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyC",
+          "key": "c",
+          "shift": true
+        }
+      },
+      {
+        "key": "ctrl+shift+x",
+        "mac": "cmd+shift+x",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyX",
+          "key": "x",
+          "shift": true
+        }
+      },
+      {
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "args": {
+          "code": "KeyV",
+          "key": "v",
+          "shift": true
+        }
+      }
     ],
     "customEditors": [
       {
         "viewType": "pyxel.editor",
         "displayName": "Pyxel Editor",
         "selector": [
-          { "filenamePattern": "*.pyxres" }
+          {
+            "filenamePattern": "*.pyxres"
+          }
         ],
         "priority": "default"
       },
@@ -92,7 +205,9 @@
         "viewType": "pyxel.player",
         "displayName": "Pyxel Player",
         "selector": [
-          { "filenamePattern": "*.pyxapp" }
+          {
+            "filenamePattern": "*.pyxapp"
+          }
         ],
         "priority": "default"
       }
@@ -101,12 +216,15 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.1"
   }
 }
