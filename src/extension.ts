@@ -4,8 +4,7 @@ import * as fs from "fs";
 import * as https from "https";
 import {
   PYXEL_CDN_BASE, PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL,
-  SKIP_DIRS, MAX_FILE_SIZE, MAX_TOTAL_SIZE, MAX_DEPTH,
-  isPyxelRunnable, getNonce,
+  isPyxelRunnable, getNonce, collectFiles,
 } from "./utils";
 
 // Mutable state
@@ -292,45 +291,6 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
       isEdit ? saveHandler(filePath) : undefined
     );
   }
-}
-
-// --- File collection ---
-
-
-function collectFiles(rootDir: string): Record<string, string> {
-  const files: Record<string, string> = {};
-  let totalSize = 0;
-
-  function walk(dir: string, depth: number) {
-    if (depth > MAX_DEPTH || totalSize > MAX_TOTAL_SIZE) return;
-    let entries: string[];
-    try {
-      entries = fs.readdirSync(dir);
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (SKIP_DIRS.has(entry) || entry.startsWith(".")) continue;
-      const fullPath = path.join(dir, entry);
-      let stat: fs.Stats;
-      try {
-        stat = fs.lstatSync(fullPath);
-      } catch {
-        continue;
-      }
-      if (stat.isSymbolicLink()) continue;
-      if (stat.isDirectory()) {
-        walk(fullPath, depth + 1);
-      } else if (stat.isFile() && stat.size <= MAX_FILE_SIZE) {
-        totalSize += stat.size;
-        if (totalSize > MAX_TOTAL_SIZE) return;
-        const relPath = path.relative(rootDir, fullPath).replace(/\\/g, "/");
-        files[relPath] = fs.readFileSync(fullPath).toString("base64");
-      }
-    }
-  }
-  walk(rootDir, 0);
-  return files;
 }
 
 // --- Message senders ---
