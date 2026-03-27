@@ -1,6 +1,9 @@
 ## 0.6.7
 
 - Extract pure logic into utils.ts and add unit tests with vitest
+- Add redirect limit to httpsGet
+- Limit auto-reload to project directory files
+- Add error handling to play mode file loading
 
 ## 0.6.6
 

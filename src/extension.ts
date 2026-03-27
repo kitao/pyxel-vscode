@@ -48,8 +48,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Auto-reload on file save (run mode only)
   context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument(() => {
-      if (runPanel && lastRunDir && lastRunScript) {
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      const saved = doc.uri.fsPath;
+      if (runPanel && lastRunDir && lastRunScript &&
+          saved.startsWith(lastRunDir + path.sep)) {
         sendRunMessage(runPanel, lastRunDir, lastRunScript);
       }
     })
@@ -196,12 +198,16 @@ const GITHUB_TREE_URL =
 const EXAMPLES_PREFIX = "python/pyxel/examples/";
 const CDN_BASE = "https://cdn.jsdelivr.net/gh/kitao/pyxel";
 
-function httpsGet(url: string): Promise<Buffer> {
+function httpsGet(url: string, maxRedirects = 5): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) {
+      reject(new Error("Too many redirects"));
+      return;
+    }
     const opts = { headers: { "User-Agent": "pyxel-vscode" } };
     https.get(url, opts, (res) => {
       if (res.statusCode === 301 || res.statusCode === 302) {
-        httpsGet(res.headers.location!).then(resolve, reject);
+        httpsGet(res.headers.location!, maxRedirects - 1).then(resolve, reject);
         return;
       }
       if (!res.statusCode || res.statusCode >= 400) {
@@ -317,7 +323,11 @@ function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {
 
 function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
   const fileName = path.basename(filePath);
-  const fileData = fs.readFileSync(filePath).toString("base64");
-  target.webview.postMessage({ command: "play", fileName, fileData });
+  try {
+    const fileData = fs.readFileSync(filePath).toString("base64");
+    target.webview.postMessage({ command: "play", fileName, fileData });
+  } catch (e: any) {
+    vscode.window.showErrorMessage(`Failed to read ${fileName}: ${e.message}`);
+  }
 }
 
