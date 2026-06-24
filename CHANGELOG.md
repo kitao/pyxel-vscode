@@ -1,3 +1,7 @@
+## 0.7.1
+
+- Simplify the file-saved notification message
+
 ## 0.7.0
 
 - Pin the Pyxel Web runtime to Pyxel 2.9.6 instead of tracking the main branch

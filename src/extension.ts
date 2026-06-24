@@ -165,7 +165,7 @@ function saveCapture(dir: string | undefined, fileName: string, data: string): v
   }
   const shown = vscode.workspace.asRelativePath(dest);
   vscode.window
-    .showInformationMessage(`Pyxel capture saved: ${shown}`, "Open", "Reveal in Explorer")
+    .showInformationMessage(`Saved: ${shown}`, "Open", "Reveal in Explorer")
     .then((choice) => {
       const uri = vscode.Uri.file(dest);
       if (choice === "Open") {
