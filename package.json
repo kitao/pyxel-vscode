@@ -2,7 +2,7 @@
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
   "description": "Run Pyxel games directly in VS Code — no installation required",
-  "version": "0.6.7",
+  "version": "0.7.0",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {
@@ -70,7 +70,7 @@
         "key": "ctrl+s",
         "mac": "cmd+s",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyS",
           "key": "s"
@@ -80,7 +80,7 @@
         "key": "ctrl+z",
         "mac": "cmd+z",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyZ",
           "key": "z"
@@ -90,7 +90,7 @@
         "key": "ctrl+y",
         "mac": "cmd+y",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyY",
           "key": "y"
@@ -100,7 +100,7 @@
         "key": "ctrl+c",
         "mac": "cmd+c",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyC",
           "key": "c"
@@ -110,7 +110,7 @@
         "key": "ctrl+x",
         "mac": "cmd+x",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyX",
           "key": "x"
@@ -120,7 +120,7 @@
         "key": "ctrl+v",
         "mac": "cmd+v",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyV",
           "key": "v"
@@ -130,7 +130,7 @@
         "key": "ctrl+a",
         "mac": "cmd+a",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyA",
           "key": "a"
@@ -140,7 +140,7 @@
         "key": "ctrl+u",
         "mac": "cmd+u",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyU",
           "key": "u"
@@ -150,7 +150,7 @@
         "key": "ctrl+d",
         "mac": "cmd+d",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyD",
           "key": "d"
@@ -160,7 +160,7 @@
         "key": "ctrl+shift+c",
         "mac": "cmd+shift+c",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyC",
           "key": "c",
@@ -171,7 +171,7 @@
         "key": "ctrl+shift+x",
         "mac": "cmd+shift+x",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyX",
           "key": "x",
@@ -182,7 +182,7 @@
         "key": "ctrl+shift+v",
         "mac": "cmd+shift+v",
         "command": "pyxel.forwardKey",
-        "when": "activeWebviewPanelId =~ /^pyxel\\./",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
         "args": {
           "code": "KeyV",
           "key": "v",
@@ -216,6 +216,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
     "package": "vsce package",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -1,3 +1,14 @@
+## 0.7.0
+
+- Pin the Pyxel Web runtime to Pyxel 2.9.6 instead of tracking the main branch
+- Route Pyxel Editor save-button output through VS Code to avoid browser save dialogs
+- Save Pyxel screenshots and screencasts next to the game and notify with the saved path
+- Recover cleanly from Pyxel Web launch failures without leaving the panel stuck
+- Split Webview HTML and Copy Examples logic into focused modules
+- Harden Copy Examples redirect handling and GitHub tree parsing
+- Compile fresh dist files before packaging the VSIX
+- Clear run-panel state on disposal and tighten command/message typing
+
 ## 0.6.7
 
 - Extract pure logic into utils.ts and add unit tests with vitest

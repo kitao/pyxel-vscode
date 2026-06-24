@@ -15,6 +15,11 @@ Run games, edit resources, and play apps directly in VS Code — no local Pyxel 
 - Open `.pyxapp` files to play Pyxel applications
 - Auto-reload on file save during execution
 
+## Runtime
+
+This extension runs Pyxel through the Pyxel Web runtime from jsDelivr. The
+runtime is pinned to Pyxel 2.9.6 so extension releases remain reproducible.
+
 ## License
 
 [MIT](LICENSE)

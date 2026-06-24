@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import * as https from "https";
 import {
   PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL,
-  isPyxelRunnable, collectFiles, getWebviewHtml,
+  isPyxelRunnable, collectFiles,
 } from "./utils";
+import { getWebviewHtml } from "./webviewHtml";
+import { copyExamples } from "./copyExamples";
 
 // Mutable state
 let outputChannel: vscode.OutputChannel;
@@ -14,6 +15,22 @@ let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
 let activePyxelWebview: vscode.Webview | undefined;
 
+interface ForwardKeyArgs {
+  code: string;
+  key: string;
+  shift?: boolean;
+}
+
+function isForwardKeyArgs(args: unknown): args is ForwardKeyArgs {
+  if (!args || typeof args !== "object") return false;
+  const value = args as { code?: unknown; key?: unknown };
+  return typeof value.code === "string" && typeof value.key === "string";
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("Pyxel");
 
@@ -21,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
     outputChannel,
     vscode.commands.registerCommand("pyxel.run", runPyxel),
     vscode.commands.registerCommand("pyxel.newResource", newResource),
-    vscode.commands.registerCommand("pyxel.copyExamples", copyExamples),
+    vscode.commands.registerCommand("pyxel.copyExamples", () => copyExamples(vscode)),
     vscode.commands.registerCommand(
       "pyxel.apiReference",
       createIframeCommand("pyxel.apiReference", "Pyxel API Reference", PYXEL_API_REFERENCE_URL)
@@ -30,7 +47,8 @@ export function activate(context: vscode.ExtensionContext) {
       "pyxel.editorManual",
       createIframeCommand("pyxel.editorManual", "Pyxel Editor Manual", PYXEL_EDITOR_MANUAL_URL)
     ),
-    vscode.commands.registerCommand("pyxel.forwardKey", (args: any) => {
+    vscode.commands.registerCommand("pyxel.forwardKey", (args: unknown) => {
+      if (!isForwardKeyArgs(args)) return;
       activePyxelWebview?.postMessage({
         command: "key", code: args.code, key: args.key, shift: !!args.shift,
       });
@@ -105,7 +123,7 @@ function trackPanel(panel: vscode.WebviewPanel) {
 function initPyxelWebview(
   panel: vscode.WebviewPanel,
   onReady: () => void,
-  onSaved?: (data: string) => void
+  onSaved?: (fileName: string, data: string) => void
 ): void {
   panel.webview.options = { enableScripts: true };
   panel.webview.html = getWebviewHtml();
@@ -120,19 +138,42 @@ function initPyxelWebview(
       outputChannel.appendLine(msg.message);
       outputChannel.show(true);
     } else if (msg.command === "saved" && onSaved) {
-      onSaved(msg.data);
+      onSaved(msg.fileName, msg.data);
     }
   });
 }
 
-function saveHandler(filePath: string): (data: string) => void {
-  return (data) => {
-    try {
-      fs.writeFileSync(filePath, Buffer.from(data, "base64"));
-    } catch (e: any) {
-      vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
-    }
-  };
+// Write the edited resource back to its original file on disk.
+function writeResource(filePath: string, data: string): void {
+  try {
+    fs.writeFileSync(filePath, Buffer.from(data, "base64"));
+  } catch (e: unknown) {
+    vscode.window.showErrorMessage(`Failed to save: ${errorMessage(e)}`);
+  }
+}
+
+// Persist a Pyxel capture (screenshot, screencast, image/palette dump) next to
+// the running game, then point the user at the file.
+function saveCapture(dir: string | undefined, fileName: string, data: string): void {
+  if (!dir) return;
+  const dest = path.join(dir, fileName);
+  try {
+    fs.writeFileSync(dest, Buffer.from(data, "base64"));
+  } catch (e: unknown) {
+    vscode.window.showErrorMessage(`Failed to save ${fileName}: ${errorMessage(e)}`);
+    return;
+  }
+  const shown = vscode.workspace.asRelativePath(dest);
+  vscode.window
+    .showInformationMessage(`Pyxel capture saved: ${shown}`, "Open", "Reveal in Explorer")
+    .then((choice) => {
+      const uri = vscode.Uri.file(dest);
+      if (choice === "Open") {
+        vscode.commands.executeCommand("vscode.open", uri);
+      } else if (choice === "Reveal in Explorer") {
+        vscode.commands.executeCommand("revealFileInOS", uri);
+      }
+    });
 }
 
 // --- Run panel management ---
@@ -147,14 +188,20 @@ function ensureRunPanel(): vscode.WebviewPanel {
     { enableScripts: true, retainContextWhenHidden: true }
   );
 
-  initPyxelWebview(runPanel, () => {
-    if (lastRunDir && lastRunScript) {
-      sendRunMessage(runPanel!, lastRunDir, lastRunScript);
-    }
-  });
+  initPyxelWebview(
+    runPanel,
+    () => {
+      if (lastRunDir && lastRunScript) {
+        sendRunMessage(runPanel!, lastRunDir, lastRunScript);
+      }
+    },
+    (fileName, data) => saveCapture(lastRunDir, fileName, data)
+  );
 
   runPanel.onDidDispose(() => {
     runPanel = undefined;
+    lastRunDir = undefined;
+    lastRunScript = undefined;
   });
 
   return runPanel;
@@ -191,83 +238,6 @@ async function newResource() {
   await vscode.commands.executeCommand("vscode.open", uri);
 }
 
-// --- Copy examples ---
-
-const GITHUB_TREE_URL =
-  "https://api.github.com/repos/kitao/pyxel/git/trees/main?recursive=1";
-const EXAMPLES_PREFIX = "python/pyxel/examples/";
-const CDN_BASE = "https://cdn.jsdelivr.net/gh/kitao/pyxel";
-
-function httpsGet(url: string, maxRedirects = 5): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    if (maxRedirects <= 0) {
-      reject(new Error("Too many redirects"));
-      return;
-    }
-    const opts = { headers: { "User-Agent": "pyxel-vscode" } };
-    https.get(url, opts, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        httpsGet(res.headers.location!, maxRedirects - 1).then(resolve, reject);
-        return;
-      }
-      if (!res.statusCode || res.statusCode >= 400) {
-        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-        res.resume();
-        return;
-      }
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-      res.on("error", reject);
-    }).on("error", reject);
-  });
-}
-
-async function copyExamples() {
-  const folders = await vscode.window.showOpenDialog({
-    canSelectFolders: true,
-    canSelectFiles: false,
-    openLabel: "Copy Examples Here",
-  });
-  if (!folders || folders.length === 0) return;
-  const targetDir = folders[0].fsPath;
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: "Copying Pyxel examples..." },
-    async () => {
-      try {
-        const treeJson = JSON.parse((await httpsGet(GITHUB_TREE_URL)).toString());
-        const files: { path: string }[] = treeJson.tree.filter(
-          (f: any) =>
-            f.type === "blob" &&
-            f.path.startsWith(EXAMPLES_PREFIX) &&
-            !f.path.includes("__pycache__")
-        );
-
-        const examplesDir = path.join(targetDir, "pyxel_examples");
-        fs.rmSync(examplesDir, { recursive: true, force: true });
-        fs.mkdirSync(examplesDir, { recursive: true });
-
-        await Promise.all(files.map(async (file) => {
-          const relPath = file.path.slice(EXAMPLES_PREFIX.length);
-          const data = await httpsGet(`${CDN_BASE}/${file.path}`);
-          const filePath = path.join(examplesDir, relPath);
-          fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, data);
-        }));
-
-        vscode.window.showInformationMessage(
-          `Copied ${files.length} example files.`
-        );
-      } catch (e: any) {
-        vscode.window.showErrorMessage(
-          `Failed to copy examples: ${e.message}`
-        );
-      }
-    }
-  );
-}
-
 // --- Custom editor provider for .pyxres and .pyxapp ---
 
 class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
@@ -287,6 +257,7 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
   ): void {
     const filePath = document.uri.fsPath;
     const isEdit = path.extname(filePath) === ".pyxres";
+    const fileDir = path.dirname(filePath);
 
     initPyxelWebview(
       webviewPanel,
@@ -294,7 +265,15 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
         if (isEdit) sendEditMessage(webviewPanel, filePath);
         else sendPlayMessage(webviewPanel, filePath);
       },
-      isEdit ? saveHandler(filePath) : undefined
+      (fileName, data) => {
+        // The editor's Save button writes the resource itself back to disk;
+        // anything else (screenshots, dumps) is treated as a capture.
+        if (isEdit && fileName === path.basename(filePath)) {
+          writeResource(filePath, data);
+        } else {
+          saveCapture(fileDir, fileName, data);
+        }
+      }
     );
   }
 }
@@ -326,8 +305,7 @@ function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
   try {
     const fileData = fs.readFileSync(filePath).toString("base64");
     target.webview.postMessage({ command: "play", fileName, fileData });
-  } catch (e: any) {
-    vscode.window.showErrorMessage(`Failed to read ${fileName}: ${e.message}`);
+  } catch (e: unknown) {
+    vscode.window.showErrorMessage(`Failed to read ${fileName}: ${errorMessage(e)}`);
   }
 }
-
