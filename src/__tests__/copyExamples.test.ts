@@ -49,6 +49,18 @@ describe("copyExamples helpers", () => {
     ]);
   });
 
+  it("rejects tree entries with unsafe path segments", () => {
+    const result = selectExampleFiles({
+      tree: [
+        { type: "blob", path: `${EXAMPLES_PREFIX}../escape.py` },
+        { type: "blob", path: `${EXAMPLES_PREFIX}a//double.py` },
+        { type: "blob", path: `${EXAMPLES_PREFIX}ok.py` },
+      ],
+    });
+
+    expect(result).toEqual([`${EXAMPLES_PREFIX}ok.py`]);
+  });
+
   it("rejects malformed GitHub tree responses", () => {
     expect(() => selectExampleFiles({})).toThrow("Invalid GitHub tree response");
     expect(() => selectExampleFiles({ tree: "not an array" })).toThrow(

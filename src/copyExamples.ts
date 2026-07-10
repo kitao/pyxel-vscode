@@ -34,6 +34,7 @@ export function selectExampleFiles(treeJson: unknown): string[] {
     if (type !== "blob" || typeof entryPath !== "string") return [];
     if (!entryPath.startsWith(EXAMPLES_PREFIX)) return [];
     if (entryPath.includes("__pycache__")) return [];
+    if (entryPath.split("/").some((part) => part === ".." || part === "")) return [];
     return [entryPath];
   });
 }

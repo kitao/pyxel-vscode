@@ -17,6 +17,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
       - run: npx vsce package
       - run: >
           gh release create "$GITHUB_REF_NAME" *.vsix

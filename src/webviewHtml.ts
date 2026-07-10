@@ -143,7 +143,9 @@ export function getWebviewHtml(): string {
     function handleRun(scriptName, files) {
       window._pendingFiles = files;
       window._pendingScriptName = scriptName;
-      window._staleFiles = prevRunFiles.filter((name) => !(name in files));
+      window._staleFiles = prevRunFiles.filter(
+        (name) => !Object.prototype.hasOwnProperty.call(files, name)
+      );
       prevRunFiles = Object.keys(files);
       executePyxel(\`
 import js, base64, os, pyxel.cli
