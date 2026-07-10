@@ -1,6 +1,29 @@
-## 0.7.1
+## 0.8.0
 
 - Simplify the file-saved notification message
+- Validate file names received from the webview before saving
+- Confirm before replacing an existing pyxel_examples folder
+- Download examples to a temp folder and swap in atomically
+- Add timeout and cancel support to example downloads
+- Debounce auto-reload so Save All reloads the game once
+- Add pyxel.autoReload setting to toggle reload on save
+- Save unsaved project files before running a script
+- Reload the running game when a resource is saved in the editor
+- Report files skipped by size or depth limits in the output channel
+- Show a clear message when the Pyxel runtime fails to load
+- Remove files deleted from the project from the runtime on reload
+- Show the script name in the run panel title
+- Forward Cmd+Shift+Z as redo to the Pyxel Editor
+- Show the output panel once per run instead of on every error
+- Type the webview message protocol with runtime validation
+- Declare Restricted Mode and virtual workspace support levels
+- Add marketplace metadata and sponsor link
+- Add GitHub Actions CI and tag-driven release workflow
+- Add ESLint and type checking for tests
+- Exclude source maps and dev config from the packaged VSIX
+- Expand README and add contributing guide
+- Skip example tree entries containing unsafe path segments
+- Run lint and tests before creating a GitHub release
 
 ## 0.7.0
 
