@@ -259,7 +259,7 @@ function ensureRunPanel(): vscode.WebviewPanel {
 
 // --- Commands ---
 
-function runPyxel(uri?: vscode.Uri) {
+async function runPyxel(uri?: vscode.Uri) {
   let filePath: string | undefined;
   if (uri) {
     filePath = uri.fsPath;
@@ -271,13 +271,26 @@ function runPyxel(uri?: vscode.Uri) {
     vscode.window.showErrorMessage("Open a .py file to run with Pyxel.");
     return;
   }
-  lastRunDir = path.dirname(filePath);
-  lastRunScript = path.basename(filePath);
+  const runDir = path.dirname(filePath);
+  const runScript = path.basename(filePath);
+  lastRunDir = runDir;
+  lastRunScript = runScript;
+  await saveDirtyDocuments(runDir);
   const isNew = !runPanel;
   const panel = ensureRunPanel();
-  panel.title = "Pyxel";
+  panel.title = `Pyxel — ${runScript}`;
   panel.reveal(isNew ? vscode.ViewColumn.Beside : undefined, true);
-  if (!isNew) sendRunMessage(panel, lastRunDir, lastRunScript);
+  if (!isNew) sendRunMessage(panel, runDir, runScript);
+  // The saves above fire save events; this run supersedes their reload.
+  cancelPendingReload();
+}
+
+// Save dirty documents under dir so the run picks up in-editor changes.
+async function saveDirtyDocuments(dir: string): Promise<void> {
+  const dirty = vscode.workspace.textDocuments.filter(
+    (doc) => doc.isDirty && !doc.isUntitled && isWatchedFile(doc.uri.fsPath, dir)
+  );
+  await Promise.all(dirty.map((doc) => doc.save()));
 }
 
 async function newResource() {
