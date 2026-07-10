@@ -15,6 +15,7 @@ let runPanel: vscode.WebviewPanel | undefined;
 let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
 let activePyxelWebview: vscode.Webview | undefined;
+let errorPanelShown = false;
 
 interface ForwardKeyArgs {
   code: string;
@@ -114,6 +115,15 @@ function postToWebview(webview: vscode.Webview, msg: HostToWebviewMessage): void
   webview.postMessage(msg);
 }
 
+// Log a webview error; pop the output panel only once per run/session.
+function reportWebviewError(message: string): void {
+  outputChannel.appendLine(message);
+  if (!errorPanelShown) {
+    errorPanelShown = true;
+    outputChannel.show(true);
+  }
+}
+
 function trackPanel(panel: vscode.WebviewPanel) {
   if (panel.active) activePyxelWebview = panel.webview;
   panel.onDidChangeViewState(() => {
@@ -146,8 +156,7 @@ function initPyxelWebview(
     } else if (msg.command === "title") {
       panel.title = msg.title;
     } else if (msg.command === "error") {
-      outputChannel.appendLine(msg.message);
-      outputChannel.show(true);
+      reportWebviewError(msg.message);
     } else if (msg.command === "saved" && onSaved) {
       if (!isSafeFileName(msg.fileName)) {
         outputChannel.appendLine(`Ignored save request with unsafe file name: ${msg.fileName}`);
@@ -298,6 +307,8 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
 function sendRunMessage(
   target: vscode.WebviewPanel, rootDir: string, scriptName: string
 ) {
+  errorPanelShown = false;
+  outputChannel.appendLine(`--- Run ${scriptName} ---`);
   const { files, skipped } = collectFiles(rootDir);
   for (const entry of skipped) {
     outputChannel.appendLine(`Skipped ${entry}`);
@@ -306,18 +317,24 @@ function sendRunMessage(
 }
 
 function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {
+  errorPanelShown = false;
   const fileName = path.basename(filePath);
-  const fileData = fs.existsSync(filePath)
-    ? fs.readFileSync(filePath).toString("base64")
-    : null;
-  const palPath = filePath.replace(/\.pyxres$/, ".pyxpal");
-  const palData = fs.existsSync(palPath)
-    ? fs.readFileSync(palPath).toString("base64")
-    : null;
-  postToWebview(target.webview, { command: "edit", fileName, fileData, palData });
+  try {
+    const fileData = fs.existsSync(filePath)
+      ? fs.readFileSync(filePath).toString("base64")
+      : null;
+    const palPath = filePath.replace(/\.pyxres$/, ".pyxpal");
+    const palData = fs.existsSync(palPath)
+      ? fs.readFileSync(palPath).toString("base64")
+      : null;
+    postToWebview(target.webview, { command: "edit", fileName, fileData, palData });
+  } catch (e: unknown) {
+    vscode.window.showErrorMessage(`Failed to read ${fileName}: ${errorMessage(e)}`);
+  }
 }
 
 function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
+  errorPanelShown = false;
   const fileName = path.basename(filePath);
   try {
     const fileData = fs.readFileSync(filePath).toString("base64");
