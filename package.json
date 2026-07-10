@@ -211,7 +211,17 @@
         ],
         "priority": "default"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Pyxel",
+      "properties": {
+        "pyxel.autoReload": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reload the running game when a file in the project folder is saved."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

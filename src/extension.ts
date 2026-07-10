@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import {
   PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL,
-  isPyxelRunnable, isSafeFileName, collectFiles,
+  isPyxelRunnable, isSafeFileName, isWatchedFile, collectFiles,
 } from "./utils";
 import { HostToWebviewMessage, parseWebviewMessage } from "./messages";
 import { getWebviewHtml } from "./webviewHtml";
@@ -16,6 +16,9 @@ let lastRunDir: string | undefined;
 let lastRunScript: string | undefined;
 let activePyxelWebview: vscode.Webview | undefined;
 let errorPanelShown = false;
+let reloadTimer: NodeJS.Timeout | undefined;
+
+const RELOAD_DEBOUNCE_MS = 200;
 
 interface ForwardKeyArgs {
   code: string;
@@ -70,10 +73,8 @@ export function activate(context: vscode.ExtensionContext) {
   // Auto-reload on file save (run mode only)
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      const saved = doc.uri.fsPath;
-      if (runPanel && lastRunDir && lastRunScript &&
-          saved.startsWith(lastRunDir + path.sep)) {
-        sendRunMessage(runPanel, lastRunDir, lastRunScript);
+      if (lastRunDir && isWatchedFile(doc.uri.fsPath, lastRunDir)) {
+        scheduleReload();
       }
     })
   );
@@ -173,6 +174,11 @@ function writeResource(filePath: string, data: string): void {
     fs.writeFileSync(filePath, Buffer.from(data, "base64"));
   } catch (e: unknown) {
     vscode.window.showErrorMessage(`Failed to save: ${errorMessage(e)}`);
+    return;
+  }
+  // Editor saves bypass onDidSaveTextDocument, so reload explicitly.
+  if (lastRunDir && isWatchedFile(filePath, lastRunDir)) {
+    scheduleReload();
   }
 }
 
@@ -202,6 +208,25 @@ function saveCapture(dir: string | undefined, fileName: string, data: string): v
 
 // --- Run panel management ---
 
+// Debounced reload so Save All triggers a single re-run.
+function scheduleReload(): void {
+  if (!runPanel || !lastRunDir || !lastRunScript) return;
+  const config = vscode.workspace.getConfiguration("pyxel");
+  if (!config.get<boolean>("autoReload", true)) return;
+  clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(() => {
+    reloadTimer = undefined;
+    if (runPanel && lastRunDir && lastRunScript) {
+      sendRunMessage(runPanel, lastRunDir, lastRunScript);
+    }
+  }, RELOAD_DEBOUNCE_MS);
+}
+
+function cancelPendingReload(): void {
+  clearTimeout(reloadTimer);
+  reloadTimer = undefined;
+}
+
 function ensureRunPanel(): vscode.WebviewPanel {
   if (runPanel) return runPanel;
 
@@ -223,6 +248,7 @@ function ensureRunPanel(): vscode.WebviewPanel {
   );
 
   runPanel.onDidDispose(() => {
+    cancelPendingReload();
     runPanel = undefined;
     lastRunDir = undefined;
     lastRunScript = undefined;
