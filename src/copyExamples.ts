@@ -38,6 +38,8 @@ export function selectExampleFiles(treeJson: unknown): string[] {
   });
 }
 
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
 export function httpsGet(url: string, maxRedirects = 5): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) {
@@ -46,7 +48,7 @@ export function httpsGet(url: string, maxRedirects = 5): Promise<Buffer> {
     }
 
     const opts = { headers: { "User-Agent": "pyxel-vscode" } };
-    https.get(url, opts, (res) => {
+    const req = https.get(url, opts, (res) => {
       if (isRedirectStatus(res.statusCode)) {
         res.resume();
         const location = res.headers.location;
@@ -69,9 +71,15 @@ export function httpsGet(url: string, maxRedirects = 5): Promise<Buffer> {
       res.on("data", (chunk) => chunks.push(chunk));
       res.on("end", () => resolve(Buffer.concat(chunks)));
       res.on("error", reject);
-    }).on("error", reject);
+    });
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Request timed out for ${url}`));
+    });
+    req.on("error", reject);
   });
 }
+
+const DOWNLOAD_CONCURRENCY = 8;
 
 export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
   const folders = await vscodeApi.window.showOpenDialog({
@@ -81,29 +89,35 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
   });
   if (!folders || folders.length === 0) return;
   const targetDir = folders[0].fsPath;
+  const examplesDir = path.join(targetDir, "pyxel_examples");
+
+  if (fs.existsSync(examplesDir)) {
+    const choice = await vscodeApi.window.showWarningMessage(
+      "The folder pyxel_examples already exists here. Replace it?",
+      { modal: true },
+      "Replace"
+    );
+    if (choice !== "Replace") return;
+  }
 
   await vscodeApi.window.withProgress(
     {
       location: vscodeApi.ProgressLocation.Notification,
       title: "Copying Pyxel examples...",
+      cancellable: true,
     },
-    async () => {
+    async (_progress, token) => {
+      // Download into a temp dir, then swap in atomically so the existing
+      // examples survive a failed or cancelled copy.
+      let tmpDir: string | undefined;
       try {
+        tmpDir = fs.mkdtempSync(path.join(targetDir, ".pyxel_examples-"));
         const treeJson = JSON.parse((await httpsGet(getExamplesTreeUrl())).toString());
         const files = selectExampleFiles(treeJson);
-
-        const examplesDir = path.join(targetDir, "pyxel_examples");
+        await downloadAll(files, tmpDir, token);
+        if (token.isCancellationRequested) return;
         fs.rmSync(examplesDir, { recursive: true, force: true });
-        fs.mkdirSync(examplesDir, { recursive: true });
-
-        await Promise.all(files.map(async (file) => {
-          const relPath = file.slice(EXAMPLES_PREFIX.length);
-          const data = await httpsGet(`${CDN_BASE}/${file}`);
-          const filePath = path.join(examplesDir, relPath);
-          fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, data);
-        }));
-
+        fs.renameSync(tmpDir, examplesDir);
         vscodeApi.window.showInformationMessage(
           `Copied ${files.length} example files.`
         );
@@ -112,7 +126,45 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
         vscodeApi.window.showErrorMessage(
           `Failed to copy examples: ${message}`
         );
+      } finally {
+        if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     }
   );
+}
+
+// Download files into destDir with bounded concurrency, honoring cancellation.
+async function downloadAll(
+  files: string[],
+  destDir: string,
+  token: vscode.CancellationToken
+): Promise<void> {
+  let next = 0;
+  let aborted = false;
+  let firstError: unknown;
+
+  async function worker(): Promise<void> {
+    while (!aborted && next < files.length && !token.isCancellationRequested) {
+      const file = files[next++];
+      try {
+        const data = await httpsGet(`${CDN_BASE}/${file}`);
+        const filePath = path.join(destDir, file.slice(EXAMPLES_PREFIX.length));
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, data);
+      } catch (e: unknown) {
+        if (!aborted) {
+          aborted = true;
+          firstError = e;
+        }
+        return;
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(DOWNLOAD_CONCURRENCY, files.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  if (aborted) throw firstError;
 }
