@@ -261,6 +261,7 @@
     "package": "vsce package",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint src"
   },
   "devDependencies": {
