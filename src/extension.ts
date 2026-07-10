@@ -95,7 +95,7 @@ function createIframeCommand(
     panel = vscode.window.createWebviewPanel(
       viewType, title,
       { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-      { enableScripts: true }
+      { enableScripts: true, localResourceRoots: [] }
     );
     panel.webview.html = `<!doctype html>
 <html><head>
@@ -142,7 +142,7 @@ function initPyxelWebview(
   onReady: () => void,
   onSaved?: (fileName: string, data: string) => void
 ): void {
-  panel.webview.options = { enableScripts: true };
+  panel.webview.options = { enableScripts: true, localResourceRoots: [] };
   panel.webview.html = getWebviewHtml();
   trackPanel(panel);
 
@@ -234,7 +234,7 @@ function ensureRunPanel(): vscode.WebviewPanel {
     "pyxel.view",
     "Pyxel",
     { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-    { enableScripts: true, retainContextWhenHidden: true }
+    { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [] }
   );
 
   initPyxelWebview(

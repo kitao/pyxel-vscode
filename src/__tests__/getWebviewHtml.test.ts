@@ -102,4 +102,18 @@ describe("getWebviewHtml", () => {
     expect(html).toContain("os.remove(name)");
     expect(html).toContain("prevRunFiles");
   });
+
+  it("shows a clear message when the Pyxel runtime fails to load", () => {
+    const html = getWebviewHtml();
+    expect(html).toContain('id="pyxel-error"');
+    expect(html).toContain("Failed to load the Pyxel runtime");
+    expect(html).toContain('typeof launchPyxel === "undefined"');
+  });
+
+  it("does not carry the ignored unsafe-inline in script-src", () => {
+    const html = getWebviewHtml();
+    const scriptSrc = html.match(/script-src[^;]*/)![0];
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).toContain("'unsafe-eval'");
+  });
 });

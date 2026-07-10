@@ -8,7 +8,7 @@ export function getWebviewHtml(): string {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
     content="default-src https://cdn.jsdelivr.net;
-      script-src 'nonce-${nonce}' https://cdn.jsdelivr.net 'unsafe-eval' 'unsafe-inline';
+      script-src 'nonce-${nonce}' https://cdn.jsdelivr.net 'unsafe-eval';
       style-src https://cdn.jsdelivr.net 'unsafe-inline';
       img-src https://cdn.jsdelivr.net data: blob:;
       connect-src https://cdn.jsdelivr.net blob: data:;
@@ -24,15 +24,34 @@ export function getWebviewHtml(): string {
     #pyxel-prompt {
       display: none !important;
     }
+    #pyxel-error {
+      display: none;
+      padding: 16px;
+      color: #ddd;
+      font-family: sans-serif;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
+  <div id="pyxel-error"></div>
   <script src="${PYXEL_CDN_BASE}/pyxel.js"></script>
   <script nonce="${nonce}">
     const vscodeApi = acquireVsCodeApi();
 
     function postError(message) {
       vscodeApi.postMessage({ command: "error", message });
+    }
+
+    const RUNTIME_LOAD_ERROR =
+      "Failed to load the Pyxel runtime from cdn.jsdelivr.net. " +
+      "Check your network connection, then close and reopen this panel.";
+
+    function showFatalError(message) {
+      const el = document.getElementById("pyxel-error");
+      el.textContent = message;
+      el.style.display = "block";
+      postError(message);
     }
 
     // Forward console.error to VS Code output channel
@@ -81,6 +100,10 @@ export function getWebviewHtml(): string {
     let pendingScript = null;
 
     async function executePyxel(script) {
+      if (typeof launchPyxel === "undefined") {
+        showFatalError(RUNTIME_LOAD_ERROR);
+        return;
+      }
       if (launching) {
         pendingScript = script;
         return;
