@@ -283,9 +283,11 @@ class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
 function sendRunMessage(
   target: vscode.WebviewPanel, rootDir: string, scriptName: string
 ) {
-  target.webview.postMessage({
-    command: "run", scriptName, files: collectFiles(rootDir),
-  });
+  const { files, skipped } = collectFiles(rootDir);
+  for (const entry of skipped) {
+    outputChannel.appendLine(`Skipped ${entry}`);
+  }
+  target.webview.postMessage({ command: "run", scriptName, files });
 }
 
 function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {

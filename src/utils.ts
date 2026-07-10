@@ -46,12 +46,21 @@ export function getNonce(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
-export function collectFiles(rootDir: string): Record<string, string> {
+export interface CollectedFiles {
+  files: Record<string, string>;
+  skipped: string[];
+}
+
+export function collectFiles(rootDir: string): CollectedFiles {
   const files: Record<string, string> = {};
+  const skipped: string[] = [];
   let totalSize = 0;
+  let truncated = false;
+
+  const rel = (fullPath: string) =>
+    path.relative(rootDir, fullPath).replace(/\\/g, "/");
 
   function walk(dir: string, depth: number) {
-    if (depth > MAX_DEPTH || totalSize > MAX_TOTAL_SIZE) return;
     let entries: string[];
     try {
       entries = fs.readdirSync(dir);
@@ -59,6 +68,7 @@ export function collectFiles(rootDir: string): Record<string, string> {
       return;
     }
     for (const entry of entries) {
+      if (truncated) return;
       if (SKIP_DIRS.has(entry) || entry.startsWith(".")) continue;
       const fullPath = path.join(dir, entry);
       let stat: fs.Stats;
@@ -69,15 +79,26 @@ export function collectFiles(rootDir: string): Record<string, string> {
       }
       if (stat.isSymbolicLink()) continue;
       if (stat.isDirectory()) {
+        if (depth >= MAX_DEPTH) {
+          skipped.push(`${rel(fullPath)}/ (exceeds depth limit of ${MAX_DEPTH})`);
+          continue;
+        }
         walk(fullPath, depth + 1);
-      } else if (stat.isFile() && stat.size <= MAX_FILE_SIZE) {
+      } else if (stat.isFile()) {
+        if (stat.size > MAX_FILE_SIZE) {
+          skipped.push(`${rel(fullPath)} (exceeds ${MAX_FILE_SIZE / 1024 / 1024} MB file limit)`);
+          continue;
+        }
+        if (totalSize + stat.size > MAX_TOTAL_SIZE) {
+          truncated = true;
+          skipped.push(`${rel(fullPath)} and remaining files (exceeds ${MAX_TOTAL_SIZE / 1024 / 1024} MB total limit)`);
+          return;
+        }
         totalSize += stat.size;
-        if (totalSize > MAX_TOTAL_SIZE) return;
-        const relPath = path.relative(rootDir, fullPath).replace(/\\/g, "/");
-        files[relPath] = fs.readFileSync(fullPath).toString("base64");
+        files[rel(fullPath)] = fs.readFileSync(fullPath).toString("base64");
       }
     }
   }
   walk(rootDir, 0);
-  return files;
+  return { files, skipped };
 }
