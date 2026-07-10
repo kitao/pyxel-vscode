@@ -113,13 +113,22 @@ export function getWebviewHtml(): string {
       resetPyxel();
     }
 
+    let prevRunFiles = [];
+
     // File names are passed to Python as data (js.window globals) rather than
     // interpolated into the source, so any filename is injection-safe.
     function handleRun(scriptName, files) {
       window._pendingFiles = files;
       window._pendingScriptName = scriptName;
+      window._staleFiles = prevRunFiles.filter((name) => !(name in files));
+      prevRunFiles = Object.keys(files);
       executePyxel(\`
-import js, base64, pyxel.cli, os
+import js, base64, os, pyxel.cli
+for name in js.window._staleFiles.to_py():
+    try:
+        os.remove(name)
+    except OSError:
+        pass
 files = js.window._pendingFiles.to_py()
 for name, b64 in files.items():
     if '/' in name:

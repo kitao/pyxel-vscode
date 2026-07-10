@@ -95,4 +95,11 @@ describe("getWebviewHtml", () => {
     expect(html).toContain('"play"');
     expect(html).toContain('"key"');
   });
+
+  it("removes files deleted from the project before re-running", () => {
+    const html = getWebviewHtml();
+    expect(html).toContain("_staleFiles");
+    expect(html).toContain("os.remove(name)");
+    expect(html).toContain("prevRunFiles");
+  });
 });
