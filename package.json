@@ -9,6 +9,27 @@
     "type": "git",
     "url": "https://github.com/kitao/pyxel-vscode"
   },
+  "homepage": "https://github.com/kitao/pyxel-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/kitao/pyxel-vscode/issues"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/kitao"
+  },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Pyxel reads game files directly from the local file system."
+    },
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Running a script executes workspace code in the Pyxel runtime."
+    }
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -188,6 +209,16 @@
           "key": "v",
           "shift": true
         }
+      },
+      {
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "command": "pyxel.forwardKey",
+        "when": "activeWebviewPanelId =~ /^pyxel\\.(view|editor|player)$/",
+        "args": {
+          "code": "KeyY",
+          "key": "y"
+        }
       }
     ],
     "customEditors": [
@@ -233,7 +264,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.3.2",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "~1.85.0",
     "@vscode/vsce": "^3.0.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.1"
