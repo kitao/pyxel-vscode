@@ -3,8 +3,9 @@ import * as path from "path";
 import * as fs from "fs";
 import {
   PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL,
-  isPyxelRunnable, collectFiles,
+  isPyxelRunnable, isSafeFileName, collectFiles,
 } from "./utils";
+import { HostToWebviewMessage, parseWebviewMessage } from "./messages";
 import { getWebviewHtml } from "./webviewHtml";
 import { copyExamples } from "./copyExamples";
 
@@ -49,7 +50,8 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("pyxel.forwardKey", (args: unknown) => {
       if (!isForwardKeyArgs(args)) return;
-      activePyxelWebview?.postMessage({
+      if (!activePyxelWebview) return;
+      postToWebview(activePyxelWebview, {
         command: "key", code: args.code, key: args.key, shift: !!args.shift,
       });
     })
@@ -108,6 +110,10 @@ function createIframeCommand(
 
 // --- Panel utilities ---
 
+function postToWebview(webview: vscode.Webview, msg: HostToWebviewMessage): void {
+  webview.postMessage(msg);
+}
+
 function trackPanel(panel: vscode.WebviewPanel) {
   if (panel.active) activePyxelWebview = panel.webview;
   panel.onDidChangeViewState(() => {
@@ -129,7 +135,12 @@ function initPyxelWebview(
   panel.webview.html = getWebviewHtml();
   trackPanel(panel);
 
-  panel.webview.onDidReceiveMessage((msg) => {
+  panel.webview.onDidReceiveMessage((raw: unknown) => {
+    const msg = parseWebviewMessage(raw);
+    if (!msg) {
+      outputChannel.appendLine("Ignored malformed message from webview.");
+      return;
+    }
     if (msg.command === "ready") {
       onReady();
     } else if (msg.command === "title") {
@@ -138,6 +149,10 @@ function initPyxelWebview(
       outputChannel.appendLine(msg.message);
       outputChannel.show(true);
     } else if (msg.command === "saved" && onSaved) {
+      if (!isSafeFileName(msg.fileName)) {
+        outputChannel.appendLine(`Ignored save request with unsafe file name: ${msg.fileName}`);
+        return;
+      }
       onSaved(msg.fileName, msg.data);
     }
   });
@@ -287,7 +302,7 @@ function sendRunMessage(
   for (const entry of skipped) {
     outputChannel.appendLine(`Skipped ${entry}`);
   }
-  target.webview.postMessage({ command: "run", scriptName, files });
+  postToWebview(target.webview, { command: "run", scriptName, files });
 }
 
 function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {
@@ -299,14 +314,14 @@ function sendEditMessage(target: vscode.WebviewPanel, filePath: string) {
   const palData = fs.existsSync(palPath)
     ? fs.readFileSync(palPath).toString("base64")
     : null;
-  target.webview.postMessage({ command: "edit", fileName, fileData, palData });
+  postToWebview(target.webview, { command: "edit", fileName, fileData, palData });
 }
 
 function sendPlayMessage(target: vscode.WebviewPanel, filePath: string) {
   const fileName = path.basename(filePath);
   try {
     const fileData = fs.readFileSync(filePath).toString("base64");
-    target.webview.postMessage({ command: "play", fileName, fileData });
+    postToWebview(target.webview, { command: "play", fileName, fileData });
   } catch (e: unknown) {
     vscode.window.showErrorMessage(`Failed to read ${fileName}: ${errorMessage(e)}`);
   }
