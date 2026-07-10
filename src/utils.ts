@@ -21,6 +21,27 @@ export function isPyxelRunnable(filePath: string | undefined): filePath is strin
   return !!filePath && filePath.endsWith(".py");
 }
 
+// Reject file names that could escape the destination directory.
+export function isSafeFileName(fileName: string): boolean {
+  return (
+    fileName.length > 0 &&
+    fileName !== "." &&
+    fileName !== ".." &&
+    !fileName.includes("/") &&
+    !fileName.includes("\\") &&
+    fileName === path.basename(fileName)
+  );
+}
+
+// Whether a saved file is part of what collectFiles would bundle.
+export function isWatchedFile(savedPath: string, rootDir: string): boolean {
+  const relPath = path.relative(rootDir, savedPath);
+  if (!relPath || relPath.startsWith("..") || path.isAbsolute(relPath)) return false;
+  return relPath
+    .split(path.sep)
+    .every((part) => !part.startsWith(".") && !SKIP_DIRS.has(part));
+}
+
 export function getNonce(): string {
   return crypto.randomBytes(16).toString("hex");
 }
