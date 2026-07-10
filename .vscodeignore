@@ -8,3 +8,9 @@ package-lock.json
 vitest.config.ts
 docs/**
 *.vsix
+.github/**
+CONTRIBUTING.md
+eslint.config.mjs
+tsconfig.test.json
+**/*.map
+.superpowers/**
