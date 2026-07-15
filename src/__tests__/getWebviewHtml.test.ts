@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PYXEL_VERSION } from "../utils";
 import { getWebviewHtml } from "../webviewHtml";
 
@@ -50,7 +50,7 @@ describe("getWebviewHtml", () => {
     expect(html).toContain('postMessage({ command: "ready" })');
   });
 
-  it("passes file names to Python as data instead of interpolating source", () => {
+  it("passes file names to Python as data", () => {
     const html = getWebviewHtml();
     expect(html).not.toContain("pyEsc");
     expect(html).toContain("js.window._pendingScriptName");
@@ -62,23 +62,25 @@ describe("getWebviewHtml", () => {
     const html = getWebviewHtml();
     expect(html).toContain("const saveBridge = function(filename)");
     expect(html).toContain("window.pyxelContext?.pyodide?.FS");
-    expect(html).toContain(
-      'postMessage({ command: "saved", fileName: basename, data: btoa(binary) })'
-    );
+    expect(html).toContain('command: "saved"');
+    expect(html).toContain("fileName: basename");
+    expect(html).toContain("data: btoa(binary)");
   });
 
-  it("forwards every Pyxel save to the host instead of filtering in the webview", () => {
+  it("forwards every Pyxel save to the host", () => {
     const html = getWebviewHtml();
     expect(html).not.toContain("_vscodeSaveFileName");
     expect(html).not.toContain("Ignoring unsupported Pyxel export");
   });
 
-  it("installs the save bridge before Pyxel can replace the browser save hook", () => {
+  it("installs the save bridge before launching Pyxel", () => {
     const html = getWebviewHtml();
     expect(html).toContain('Object.defineProperty(window, "_savePyxelFile"');
-    expect(html.indexOf("installSaveBridge();")).toBeLessThan(
-      html.indexOf("await launchPyxel")
-    );
+    const installIndex = html.indexOf("installSaveBridge();");
+    const launchIndex = html.indexOf("await launchPyxel");
+    expect(installIndex).toBeGreaterThanOrEqual(0);
+    expect(launchIndex).toBeGreaterThanOrEqual(0);
+    expect(installIndex).toBeLessThan(launchIndex);
   });
 
   it("clears the launch-in-progress state when Pyxel fails to start", () => {
@@ -88,12 +90,17 @@ describe("getWebviewHtml", () => {
     expect(html).toContain("launching = false;");
   });
 
+  it("waits for a reset before processing another command", () => {
+    const html = getWebviewHtml();
+    expect(html).toContain("await resetPyxel();");
+  });
+
   it("handles run, edit, play, and key commands", () => {
     const html = getWebviewHtml();
-    expect(html).toContain('"run"');
-    expect(html).toContain('"edit"');
-    expect(html).toContain('"play"');
-    expect(html).toContain('"key"');
+    expect(html).toContain('if (msg.command === "run")');
+    expect(html).toContain('else if (msg.command === "edit")');
+    expect(html).toContain('else if (msg.command === "play")');
+    expect(html).toContain('else if (msg.command === "key")');
   });
 
   it("removes files deleted from the project before re-running", () => {

@@ -1,3 +1,18 @@
+## 0.9.0
+
+- Make project file collection deterministic across file systems
+- Report project entries that cannot be collected
+- Reload only files that can affect the bundled Pyxel project
+- Preserve existing examples when replacement fails or copying is cancelled
+- Reject invalid, truncated, and empty example metadata responses
+- Reject invalid HTTP responses and redirect locations
+- Stop a run when unsaved project files cannot be saved
+- Serialize Webview resets so rapid reloads cannot overlap
+- Validate Webview save data before writing it to disk
+- Add the `.pyxres` extension when needed and open new resources in Pyxel Editor
+- Update the Pyxel Web runtime and bundled examples to Pyxel 2.9.8
+- Separate HTTP, Webview, run-panel, editor, and file-output responsibilities
+
 ## 0.8.0
 
 - Simplify the file-saved notification message
@@ -28,8 +43,8 @@
 ## 0.7.0
 
 - Pin the Pyxel Web runtime to Pyxel 2.9.6 instead of tracking the main branch
-- Route Pyxel Editor save-button output through VS Code to avoid browser save dialogs
-- Save Pyxel screenshots and screencasts next to the game and notify with the saved path
+- Route Pyxel Editor saves through VS Code instead of browser downloads
+- Save Pyxel captures next to the game and show the saved path
 - Recover cleanly from Pyxel Web launch failures without leaving the panel stuck
 - Split Webview HTML and Copy Examples logic into focused modules
 - Harden Copy Examples redirect handling and GitHub tree parsing
@@ -94,7 +109,7 @@
 
 ## 0.4.0
 
-- Add keyboard shortcut forwarding for Pyxel Editor (copy, paste, undo, redo, etc.)
+- Forward Pyxel Editor clipboard, undo, and redo shortcuts
 
 ## 0.3.0
 

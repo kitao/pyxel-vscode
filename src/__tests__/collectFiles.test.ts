@@ -1,8 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "fs";
-import * as path from "path";
 import * as os from "os";
+import * as path from "path";
 import { collectFiles } from "../utils";
+
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    lstatSync: vi.fn(actual.lstatSync),
+    readFileSync: vi.fn(actual.readFileSync),
+    readdirSync: vi.fn(actual.readdirSync),
+  };
+});
 
 let tmpDir: string;
 
@@ -14,7 +24,7 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function writeFile(relPath: string, content: string) {
+function writeFile(relPath: string, content: string): void {
   const fullPath = path.join(tmpDir, relPath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content);
@@ -35,6 +45,18 @@ describe("collectFiles", () => {
     writeFile("sub/b.txt", "b");
     const { files } = collectFiles(tmpDir);
     expect(Object.keys(files).sort()).toEqual(["sub/a.py", "sub/b.txt"]);
+  });
+
+  it("collects directory entries in deterministic order", () => {
+    writeFile("a.py", "a");
+    writeFile("z.py", "z");
+    vi.mocked(fs.readdirSync).mockImplementationOnce(
+      (() => ["z.py", "a.py"]) as unknown as typeof fs.readdirSync
+    );
+
+    const { files } = collectFiles(tmpDir);
+
+    expect(Object.keys(files)).toEqual(["a.py", "z.py"]);
   });
 
   it("skips .git directory", () => {
@@ -67,15 +89,14 @@ describe("collectFiles", () => {
   });
 
   it("respects MAX_DEPTH (3 levels)", () => {
-    writeFile("a/b/c/deep.py", "ok");       // depth 3 — included
-    writeFile("a/b/c/d/too_deep.py", "no");  // depth 4 — excluded
+    writeFile("a/b/c/deep.py", "ok");
+    writeFile("a/b/c/d/too_deep.py", "no");
     const { files } = collectFiles(tmpDir);
     expect(files).toHaveProperty("a/b/c/deep.py");
     expect(files).not.toHaveProperty("a/b/c/d/too_deep.py");
   });
 
   it("skips files larger than MAX_FILE_SIZE", () => {
-    // Create a file just over 5MB
     const bigContent = "x".repeat(5 * 1024 * 1024 + 1);
     writeFile("big.bin", bigContent);
     writeFile("small.py", "ok");
@@ -85,15 +106,16 @@ describe("collectFiles", () => {
   });
 
   it("stops when total size exceeds MAX_TOTAL_SIZE", () => {
-    // Create many 1MB files to exceed 20MB total
     for (let i = 0; i < 25; i++) {
-      writeFile(`file${String(i).padStart(2, "0")}.bin`, "x".repeat(1024 * 1024));
+      const fileName = `file${String(i).padStart(2, "0")}.bin`;
+      writeFile(fileName, "x".repeat(1024 * 1024));
     }
     const { files } = collectFiles(tmpDir);
     const totalSize = Object.values(files).reduce(
       (sum, b64) => sum + Buffer.from(b64, "base64").length, 0
     );
-    expect(totalSize).toBeLessThanOrEqual(20 * 1024 * 1024);
+    expect(Object.keys(files)).toHaveLength(20);
+    expect(totalSize).toBe(20 * 1024 * 1024);
   });
 
   it("returns empty object for empty directory", () => {
@@ -119,11 +141,59 @@ describe("collectFiles", () => {
     expect(keys[0]).not.toContain("\\");
   });
 
+  it.skipIf(path.sep === "\\")(
+    "preserves literal backslashes in POSIX file names",
+    () => {
+      writeFile("name\\part.py", "ok");
+
+      const { files } = collectFiles(tmpDir);
+
+      expect(Object.keys(files)).toEqual(["name\\part.py"]);
+    }
+  );
+
   it("reports files skipped for exceeding MAX_FILE_SIZE", () => {
     writeFile("big.bin", "x".repeat(5 * 1024 * 1024 + 1));
     writeFile("small.py", "ok");
     const { skipped } = collectFiles(tmpDir);
     expect(skipped).toEqual(["big.bin (exceeds 5 MB file limit)"]);
+  });
+
+  it("reports files that become unreadable during collection", () => {
+    writeFile("blocked.py", "data");
+    vi.mocked(fs.readFileSync).mockImplementationOnce(() => {
+      throw new Error("read failed");
+    });
+
+    const { files, skipped } = collectFiles(tmpDir);
+
+    expect(files).toEqual({});
+    expect(skipped).toEqual(["blocked.py (could not be read: read failed)"]);
+  });
+
+  it("reports directories that cannot be read", () => {
+    vi.mocked(fs.readdirSync).mockImplementationOnce(() => {
+      throw new Error("scan failed");
+    });
+
+    const { files, skipped } = collectFiles(tmpDir);
+
+    expect(files).toEqual({});
+    expect(skipped).toEqual(["./ (could not be read: scan failed)"]);
+  });
+
+  it("reports entries that cannot be inspected", () => {
+    writeFile("vanished.py", "data");
+    vi.mocked(fs.lstatSync).mockImplementationOnce(() => {
+      throw new Error("stat failed");
+    });
+
+    const { files, skipped } = collectFiles(tmpDir);
+
+    expect(files).toEqual({});
+    expect(skipped).toEqual([
+      "vanished.py (could not be inspected: stat failed)",
+    ]);
   });
 
   it("reports directories skipped for exceeding MAX_DEPTH", () => {
@@ -134,11 +204,13 @@ describe("collectFiles", () => {
 
   it("reports truncation when total size exceeds MAX_TOTAL_SIZE", () => {
     for (let i = 0; i < 25; i++) {
-      writeFile(`file${String(i).padStart(2, "0")}.bin`, "x".repeat(1024 * 1024));
+      const fileName = `file${String(i).padStart(2, "0")}.bin`;
+      writeFile(fileName, "x".repeat(1024 * 1024));
     }
     const { skipped } = collectFiles(tmpDir);
-    expect(skipped.length).toBe(1);
-    expect(skipped[0]).toContain("(exceeds 20 MB total limit)");
+    expect(skipped).toEqual([
+      "file20.bin and remaining files (exceeds 20 MB total limit)",
+    ]);
   });
 
   it("does not report intentional skips (dotfiles, skip dirs)", () => {

@@ -1,5 +1,59 @@
 import { PYXEL_CDN_BASE, getNonce } from "./utils";
 
+const RUN_SCRIPT = `
+import base64
+import js
+import os
+import pyxel.cli
+
+for name in js.window._staleFiles.to_py():
+    try:
+        os.remove(name)
+    except OSError:
+        pass
+files = js.window._pendingFiles.to_py()
+for name, b64 in files.items():
+    if '/' in name:
+        os.makedirs(os.path.dirname(name), exist_ok=True)
+    with open(name, 'wb') as f:
+        f.write(base64.b64decode(b64))
+pyxel.cli.run_python_script(js.window._pendingScriptName)
+`;
+
+const EDIT_SCRIPT = `
+import base64
+import js
+import pyxel.cli
+
+name = js.window._pendingFileName
+file_data = js.window._pendingFileData
+if file_data:
+    data = base64.b64decode(file_data)
+    with open(name, 'wb') as f:
+        f.write(data)
+pal_data = js.window._pendingPalData
+if pal_data:
+    if name.endswith('.pyxres'):
+        pal_name = name[:-7] + '.pyxpal'
+    else:
+        pal_name = name + '.pyxpal'
+    with open(pal_name, 'wb') as f:
+        f.write(base64.b64decode(pal_data))
+pyxel.cli.edit_pyxel_resource(name)
+`;
+
+const PLAY_SCRIPT = `
+import base64
+import js
+import pyxel.cli
+
+name = js.window._pendingFileName
+data = base64.b64decode(js.window._pendingFileData)
+with open(name, 'wb') as f:
+    f.write(data)
+pyxel.cli.play_pyxel_app(name)
+`;
+
 export function getWebviewHtml(): string {
   const nonce = getNonce();
   return `<!doctype html>
@@ -34,7 +88,7 @@ export function getWebviewHtml(): string {
   </style>
 </head>
 <body>
-  <div id="pyxel-error"></div>
+  <div id="pyxel-error" role="alert"></div>
   <script src="${PYXEL_CDN_BASE}/pyxel.js"></script>
   <script nonce="${nonce}">
     const vscodeApi = acquireVsCodeApi();
@@ -54,10 +108,9 @@ export function getWebviewHtml(): string {
       postError(message);
     }
 
-    // Forward console.error to VS Code output channel
-    const _origConsoleError = console.error;
+    const originalConsoleError = console.error;
     console.error = (...args) => {
-      _origConsoleError.apply(console, args);
+      originalConsoleError.apply(console, args);
       postError(args.join(" "));
     };
 
@@ -76,10 +129,14 @@ export function getWebviewHtml(): string {
           for (let i = 0; i < bytes.length; i += chunkSize) {
             binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
           }
-          vscodeApi.postMessage({ command: "saved", fileName: basename, data: btoa(binary) });
+          vscodeApi.postMessage({
+            command: "saved",
+            fileName: basename,
+            data: btoa(binary),
+          });
         } catch (error) {
           const message = error?.message || String(error);
-          postError(\`Failed to save \${filename}: \${message}\`);
+          postError("Failed to save " + filename + ": " + message);
         }
       };
       Object.defineProperty(window, "_savePyxelFile", {
@@ -116,7 +173,7 @@ export function getWebviewHtml(): string {
           pyxelReady = true;
         } catch (error) {
           const message = error?.message || String(error);
-          postError(\`Failed to launch Pyxel: \${message}\`);
+          postError("Failed to launch Pyxel: " + message);
         } finally {
           launching = false;
         }
@@ -127,13 +184,25 @@ export function getWebviewHtml(): string {
         if (pendingScript) {
           const s = pendingScript;
           pendingScript = null;
-          window.pyxelContext.params.script = s;
-          resetPyxel();
+          await executePyxel(s);
         }
         return;
       }
-      window.pyxelContext.params.script = script;
-      resetPyxel();
+      launching = true;
+      try {
+        window.pyxelContext.params.script = script;
+        await resetPyxel();
+      } catch (error) {
+        const message = error?.message || String(error);
+        postError("Failed to reset Pyxel: " + message);
+      } finally {
+        launching = false;
+      }
+      if (pendingScript) {
+        const s = pendingScript;
+        pendingScript = null;
+        await executePyxel(s);
+      }
     }
 
     let prevRunFiles = [];
@@ -147,55 +216,20 @@ export function getWebviewHtml(): string {
         (name) => !Object.prototype.hasOwnProperty.call(files, name)
       );
       prevRunFiles = Object.keys(files);
-      executePyxel(\`
-import js, base64, os, pyxel.cli
-for name in js.window._staleFiles.to_py():
-    try:
-        os.remove(name)
-    except OSError:
-        pass
-files = js.window._pendingFiles.to_py()
-for name, b64 in files.items():
-    if '/' in name:
-        os.makedirs(os.path.dirname(name), exist_ok=True)
-    with open(name, 'wb') as f:
-        f.write(base64.b64decode(b64))
-pyxel.cli.run_python_script(js.window._pendingScriptName)
-      \`);
+      executePyxel(${JSON.stringify(RUN_SCRIPT)});
     }
 
     function handleEdit(fileName, fileData, palData) {
       window._pendingFileData = fileData;
       window._pendingPalData = palData;
       window._pendingFileName = fileName;
-      executePyxel(\`
-import js, base64, pyxel.cli
-name = js.window._pendingFileName
-file_data = js.window._pendingFileData
-if file_data:
-    data = base64.b64decode(file_data)
-    with open(name, 'wb') as f:
-        f.write(data)
-pal_data = js.window._pendingPalData
-if pal_data:
-    pal_name = name[:-7] + '.pyxpal' if name.endswith('.pyxres') else name + '.pyxpal'
-    with open(pal_name, 'wb') as f:
-        f.write(base64.b64decode(pal_data))
-pyxel.cli.edit_pyxel_resource(name)
-      \`);
+      executePyxel(${JSON.stringify(EDIT_SCRIPT)});
     }
 
     function handlePlay(fileName, fileData) {
       window._pendingFileData = fileData;
       window._pendingFileName = fileName;
-      executePyxel(\`
-import js, base64, pyxel.cli
-name = js.window._pendingFileName
-data = base64.b64decode(js.window._pendingFileData)
-with open(name, 'wb') as f:
-    f.write(data)
-pyxel.cli.play_pyxel_app(name)
-      \`);
+      executePyxel(${JSON.stringify(PLAY_SCRIPT)});
     }
 
     window.addEventListener("message", (event) => {
@@ -208,12 +242,26 @@ pyxel.cli.play_pyxel_app(name)
       } else if (msg.command === "play") {
         handlePlay(msg.fileName, msg.fileData);
       } else if (msg.command === "key") {
-        // Forward keyboard shortcuts from VS Code to Pyxel
-        const fire = (type, code, key, opts) =>
-          document.dispatchEvent(new KeyboardEvent(type, { code, key, bubbles: true, ...opts }));
+        const fire = (type, code, key, opts) => {
+          const event = new KeyboardEvent(type, {
+            code,
+            key,
+            bubbles: true,
+            ...opts,
+          });
+          document.dispatchEvent(event);
+        };
         fire("keydown", "ControlLeft", "Control", { ctrlKey: true });
-        if (msg.shift) fire("keydown", "ShiftLeft", "Shift", { ctrlKey: true, shiftKey: true });
-        fire("keydown", msg.code, msg.key, { ctrlKey: true, shiftKey: !!msg.shift });
+        if (msg.shift) {
+          fire("keydown", "ShiftLeft", "Shift", {
+            ctrlKey: true,
+            shiftKey: true,
+          });
+        }
+        fire("keydown", msg.code, msg.key, {
+          ctrlKey: true,
+          shiftKey: !!msg.shift,
+        });
         setTimeout(() => {
           fire("keyup", msg.code, msg.key, {});
           if (msg.shift) fire("keyup", "ShiftLeft", "Shift", {});
@@ -222,7 +270,6 @@ pyxel.cli.play_pyxel_app(name)
       }
     });
 
-    // Watch for document.title changes (set by pyxel.init title parameter)
     new MutationObserver(() => {
       if (document.title) {
         vscodeApi.postMessage({ command: "title", title: document.title });

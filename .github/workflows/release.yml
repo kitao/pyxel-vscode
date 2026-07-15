@@ -20,7 +20,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npx vsce package
+      - run: npm run package
       - run: >
           gh release create "$GITHUB_REF_NAME" *.vsix
           --title "$GITHUB_REF_NAME"

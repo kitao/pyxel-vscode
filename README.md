@@ -39,7 +39,7 @@ installation required. Everything runs on the Pyxel Web runtime inside VS Code.
 
 ## Requirements and Limitations
 
-- The Pyxel Web runtime (pinned to Pyxel 2.9.6) is loaded from jsDelivr, so an
+- The Pyxel Web runtime (pinned to Pyxel 2.9.8) is loaded from jsDelivr, so an
   internet connection is required to launch games.
 - Project files are bundled into the runtime with these limits: 5 MB per file,
   20 MB in total, 3 directory levels deep. Files skipped by these limits are

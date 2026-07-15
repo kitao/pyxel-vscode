@@ -1,86 +1,14 @@
 import type * as vscode from "vscode";
 import * as fs from "fs";
-import * as https from "https";
 import * as path from "path";
-import { PYXEL_VERSION } from "./utils";
+import { httpsGet } from "./http";
+import { PYXEL_VERSION, toErrorMessage } from "./utils";
 
 export const EXAMPLES_PREFIX = "python/pyxel/examples/";
 const CDN_BASE = `https://cdn.jsdelivr.net/gh/kitao/pyxel@v${PYXEL_VERSION}`;
+const DOWNLOAD_CONCURRENCY = 8;
 
 type VsCodeApi = typeof vscode;
-
-export function getExamplesTreeUrl(): string {
-  return `https://api.github.com/repos/kitao/pyxel/git/trees/v${PYXEL_VERSION}?recursive=1`;
-}
-
-export function isRedirectStatus(statusCode: number | undefined): boolean {
-  return statusCode === 301 || statusCode === 302 || statusCode === 303 ||
-    statusCode === 307 || statusCode === 308;
-}
-
-export function resolveRedirectUrl(currentUrl: string, location: string): string {
-  return new URL(location, currentUrl).toString();
-}
-
-export function selectExampleFiles(treeJson: unknown): string[] {
-  if (!treeJson || typeof treeJson !== "object" ||
-      !Array.isArray((treeJson as { tree?: unknown }).tree)) {
-    throw new Error("Invalid GitHub tree response");
-  }
-
-  return (treeJson as { tree: unknown[] }).tree.flatMap((entry) => {
-    if (!entry || typeof entry !== "object") return [];
-    const { path: entryPath, type } = entry as { path?: unknown; type?: unknown };
-    if (type !== "blob" || typeof entryPath !== "string") return [];
-    if (!entryPath.startsWith(EXAMPLES_PREFIX)) return [];
-    if (entryPath.includes("__pycache__")) return [];
-    if (entryPath.split("/").some((part) => part === ".." || part === "")) return [];
-    return [entryPath];
-  });
-}
-
-const REQUEST_TIMEOUT_MS = 30 * 1000;
-
-export function httpsGet(url: string, maxRedirects = 5): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    if (maxRedirects <= 0) {
-      reject(new Error("Too many redirects"));
-      return;
-    }
-
-    const opts = { headers: { "User-Agent": "pyxel-vscode" } };
-    const req = https.get(url, opts, (res) => {
-      if (isRedirectStatus(res.statusCode)) {
-        res.resume();
-        const location = res.headers.location;
-        if (!location) {
-          reject(new Error(`Redirect missing Location for ${url}`));
-          return;
-        }
-        httpsGet(resolveRedirectUrl(url, location), maxRedirects - 1)
-          .then(resolve, reject);
-        return;
-      }
-
-      if (!res.statusCode || res.statusCode >= 400) {
-        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-        res.resume();
-        return;
-      }
-
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-      res.on("error", reject);
-    });
-    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Request timed out for ${url}`));
-    });
-    req.on("error", reject);
-  });
-}
-
-const DOWNLOAD_CONCURRENCY = 8;
 
 export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
   const folders = await vscodeApi.window.showOpenDialog({
@@ -108,24 +36,24 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
       cancellable: true,
     },
     async (_progress, token) => {
-      // Download into a temp dir, then swap in atomically so the existing
-      // examples survive a failed or cancelled copy.
+      // Keep the existing examples until the replacement is ready.
       let tmpDir: string | undefined;
       try {
         tmpDir = fs.mkdtempSync(path.join(targetDir, ".pyxel_examples-"));
-        const treeJson = JSON.parse((await httpsGet(getExamplesTreeUrl())).toString());
+        const treeJson = JSON.parse(
+          (await httpsGet(getExamplesTreeUrl(), 5, token)).toString()
+        );
         const files = selectExampleFiles(treeJson);
         await downloadAll(files, tmpDir, token);
         if (token.isCancellationRequested) return;
-        fs.rmSync(examplesDir, { recursive: true, force: true });
-        fs.renameSync(tmpDir, examplesDir);
+        replaceExamplesDirectory(tmpDir, examplesDir);
         vscodeApi.window.showInformationMessage(
           `Copied ${files.length} example files.`
         );
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
+      } catch (error: unknown) {
+        if (token.isCancellationRequested) return;
         vscodeApi.window.showErrorMessage(
-          `Failed to copy examples: ${message}`
+          `Failed to copy examples: ${toErrorMessage(error)}`
         );
       } finally {
         if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -134,7 +62,85 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
   );
 }
 
-// Download files into destDir with bounded concurrency, honoring cancellation.
+export function getExamplesTreeUrl(): string {
+  return `https://api.github.com/repos/kitao/pyxel/git/trees/v${PYXEL_VERSION}?recursive=1`;
+}
+
+export function selectExampleFiles(treeJson: unknown): string[] {
+  if (
+    !treeJson ||
+    typeof treeJson !== "object" ||
+    !Array.isArray((treeJson as { tree?: unknown }).tree)
+  ) {
+    throw new Error("Invalid GitHub tree response");
+  }
+  if ((treeJson as { truncated?: unknown }).truncated === true) {
+    throw new Error("GitHub tree response is truncated");
+  }
+
+  const files = (treeJson as { tree: unknown[] }).tree.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const { path: entryPath, type } = entry as {
+      path?: unknown;
+      type?: unknown;
+    };
+    if (type !== "blob" || typeof entryPath !== "string") return [];
+    if (!entryPath.startsWith(EXAMPLES_PREFIX)) return [];
+    if (entryPath.includes("__pycache__")) return [];
+    if (entryPath.includes("\\")) return [];
+    if (entryPath.split("/").some((part) => part === ".." || part === "")) {
+      return [];
+    }
+    return [entryPath];
+  });
+  if (files.length === 0) {
+    throw new Error("GitHub tree response contains no Pyxel examples");
+  }
+  return files;
+}
+
+function replaceExamplesDirectory(
+  sourceDir: string,
+  examplesDir: string
+): void {
+  let backupRoot: string | undefined;
+  let backupDir: string | undefined;
+  if (fs.existsSync(examplesDir)) {
+    backupRoot = fs.mkdtempSync(
+      path.join(path.dirname(examplesDir), ".pyxel_examples-backup-")
+    );
+    backupDir = path.join(backupRoot, path.basename(examplesDir));
+    try {
+      fs.renameSync(examplesDir, backupDir);
+    } catch (error: unknown) {
+      fs.rmSync(backupRoot, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  try {
+    fs.renameSync(sourceDir, examplesDir);
+  } catch (error: unknown) {
+    if (backupRoot && backupDir) {
+      try {
+        fs.renameSync(backupDir, examplesDir);
+      } catch (restoreError: unknown) {
+        throw new Error(
+          `Failed to restore existing examples from ${backupDir}: ` +
+          toErrorMessage(restoreError),
+          { cause: error }
+        );
+      }
+      fs.rmSync(backupRoot, { recursive: true, force: true });
+    }
+    throw error;
+  }
+
+  if (backupRoot) {
+    fs.rmSync(backupRoot, { recursive: true, force: true });
+  }
+}
+
 async function downloadAll(
   files: string[],
   destDir: string,
@@ -148,14 +154,15 @@ async function downloadAll(
     while (!aborted && next < files.length && !token.isCancellationRequested) {
       const file = files[next++];
       try {
-        const data = await httpsGet(`${CDN_BASE}/${file}`);
+        const data = await httpsGet(`${CDN_BASE}/${file}`, 5, token);
         const filePath = path.join(destDir, file.slice(EXAMPLES_PREFIX.length));
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, data);
-      } catch (e: unknown) {
+      } catch (error: unknown) {
+        if (token.isCancellationRequested) return;
         if (!aborted) {
           aborted = true;
-          firstError = e;
+          firstError = error;
         }
         return;
       }
@@ -167,5 +174,6 @@ async function downloadAll(
     () => worker()
   );
   await Promise.all(workers);
+  if (token.isCancellationRequested) return;
   if (aborted) throw firstError;
 }

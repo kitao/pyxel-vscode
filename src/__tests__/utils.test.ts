@@ -1,6 +1,18 @@
-import { describe, it, expect } from "vitest";
-import { isPyxelRunnable, getNonce, isSafeFileName, isWatchedFile } from "../utils";
+import { describe, expect, it } from "vitest";
 import * as path from "path";
+import {
+  PYXEL_VERSION,
+  isPyxelRunnable,
+  getNonce,
+  isSafeFileName,
+  isWatchedFile,
+} from "../utils";
+
+describe("PYXEL_VERSION", () => {
+  it("pins Pyxel to version 2.9.8", () => {
+    expect(PYXEL_VERSION).toBe("2.9.8");
+  });
+});
 
 describe("isPyxelRunnable", () => {
   it("accepts a .py file path", () => {
@@ -70,15 +82,35 @@ describe("isWatchedFile", () => {
   });
 
   it("rejects files outside the root", () => {
-    expect(isWatchedFile(path.join(path.sep, "other", "main.py"), root)).toBe(false);
+    expect(isWatchedFile(
+      path.join(path.sep, "other", "main.py"),
+      root
+    )).toBe(false);
     expect(isWatchedFile(path.join(root, "..", "main.py"), root)).toBe(false);
   });
 
   it("rejects dotfiles and skip directories", () => {
     expect(isWatchedFile(path.join(root, ".env"), root)).toBe(false);
-    expect(isWatchedFile(path.join(root, ".venv", "lib", "x.py"), root)).toBe(false);
-    expect(isWatchedFile(path.join(root, "node_modules", "p", "i.js"), root)).toBe(false);
-    expect(isWatchedFile(path.join(root, "__pycache__", "m.pyc"), root)).toBe(false);
+    expect(isWatchedFile(
+      path.join(root, ".venv", "lib", "x.py"),
+      root
+    )).toBe(false);
+    expect(isWatchedFile(
+      path.join(root, "node_modules", "p", "i.js"),
+      root
+    )).toBe(false);
+    expect(isWatchedFile(
+      path.join(root, "__pycache__", "m.pyc"),
+      root
+    )).toBe(false);
+  });
+
+  it("rejects files deeper than the collection limit", () => {
+    expect(isWatchedFile(path.join(root, "a", "b", "c", "ok.py"), root))
+      .toBe(true);
+    expect(isWatchedFile(
+      path.join(root, "a", "b", "c", "d", "deep.py"),
+      root
+    )).toBe(false);
   });
 });
-

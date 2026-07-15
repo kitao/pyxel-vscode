@@ -4,6 +4,6 @@
     "noEmit": true,
     "sourceMap": false
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["dist", "node_modules"],
+  "include": ["src"]
 }

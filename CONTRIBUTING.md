@@ -28,11 +28,12 @@ extension loaded.
 npm run lint
 npm run typecheck
 npm test
+npm run package
 ```
 
-All three must pass (CI runs the same checks). Keep changes focused, follow
-the existing code style, and add or update unit tests for pure logic in
-`src/utils.ts`, `src/messages.ts`, and `src/copyExamples.ts`.
+All four must pass (CI runs the same checks). Keep changes focused, follow
+the existing code style, and add or update tests in `src/__tests__` for the
+modules you change.
 
 Note that the Pyxel runtime version is pinned in `src/utils.ts`
 (`PYXEL_VERSION`); runtime upgrades are handled by the maintainer.
