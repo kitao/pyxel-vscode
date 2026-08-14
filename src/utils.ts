@@ -2,7 +2,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 
-export const PYXEL_VERSION = "2.9.8";
+export const PYXEL_VERSION = "2.9.9";
 export const PYXEL_CDN_BASE =
   `https://cdn.jsdelivr.net/gh/kitao/pyxel@v${PYXEL_VERSION}/wasm`;
 export const PYXEL_API_REFERENCE_URL =

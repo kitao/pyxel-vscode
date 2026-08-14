@@ -10,7 +10,7 @@
 - Serialize Webview resets so rapid reloads cannot overlap
 - Validate Webview save data before writing it to disk
 - Add the `.pyxres` extension when needed and open new resources in Pyxel Editor
-- Update the Pyxel Web runtime and bundled examples to Pyxel 2.9.8
+- Update the Pyxel Web runtime and bundled examples to Pyxel 2.9.9
 - Separate HTTP, Webview, run-panel, editor, and file-output responsibilities
 
 ## 0.8.0
