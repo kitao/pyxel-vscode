@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import {
   PYXEL_VERSION,
+  findExecutable,
   isPyxelRunnable,
   getNonce,
   isSafeFileName,
@@ -112,5 +115,41 @@ describe("isWatchedFile", () => {
       path.join(root, "a", "b", "c", "d", "deep.py"),
       root
     )).toBe(false);
+  });
+});
+
+describe("findExecutable", () => {
+  const created: string[] = [];
+
+  function pathDir(...names: string[]): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-path-"));
+    for (const name of names) fs.writeFileSync(path.join(dir, name), "");
+    created.push(dir);
+    return dir;
+  }
+
+  afterEach(() => {
+    for (const dir of created.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns the first matching file on PATH", () => {
+    const dir = pathDir("uvx");
+    const env = { PATH: [path.join(dir, "missing"), dir].join(path.delimiter) };
+
+    expect(findExecutable("uvx", env)).toBe(path.join(dir, "uvx"));
+  });
+
+  it("returns undefined when PATH has no match or is unset", () => {
+    expect(findExecutable("uvx", { PATH: pathDir() })).toBeUndefined();
+    expect(findExecutable("uvx", {})).toBeUndefined();
+  });
+
+  it("tries the PATHEXT extensions Windows provides", () => {
+    const dir = pathDir("uvx.EXE");
+
+    expect(findExecutable("uvx", { PATH: dir, PATHEXT: ".COM;.EXE" })).toBe(
+      path.join(dir, "uvx.EXE")
+    );
+    expect(findExecutable("uvx", { PATH: dir })).toBeUndefined();
   });
 });

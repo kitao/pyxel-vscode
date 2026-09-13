@@ -3,6 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 
 export const PYXEL_VERSION = "2.9.9";
+export const PYXEL_MCP_VERSION = "1.3.0";
+export const MCP_PROVIDER_ID = "pyxel.mcp";
 export const PYXEL_CDN_BASE =
   `https://cdn.jsdelivr.net/gh/kitao/pyxel@v${PYXEL_VERSION}/wasm`;
 export const PYXEL_API_REFERENCE_URL =
@@ -60,6 +62,27 @@ export function isWatchedFile(savedPath: string, rootDir: string): boolean {
 
 export function getNonce(): string {
   return crypto.randomBytes(16).toString("hex");
+}
+
+// Locate an executable on PATH the way a shell would, without spawning one.
+// PATHEXT exists only on Windows, where executables carry an extension.
+export function findExecutable(
+  name: string,
+  env: NodeJS.ProcessEnv = process.env
+): string | undefined {
+  const directories = (env.PATH ?? "").split(path.delimiter).filter(Boolean);
+  const extensions = ["", ...(env.PATHEXT ?? "").split(";").filter(Boolean)];
+  for (const directory of directories) {
+    for (const extension of extensions) {
+      const candidate = path.join(directory, name + extension);
+      try {
+        if (fs.statSync(candidate).isFile()) return candidate;
+      } catch {
+        // Not here; keep looking.
+      }
+    }
+  }
+  return undefined;
 }
 
 export function collectFiles(rootDir: string): CollectedFiles {

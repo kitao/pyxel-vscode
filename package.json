@@ -1,7 +1,7 @@
 {
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
-  "description": "Run Pyxel games directly in VS Code — no installation required",
+  "description": "Run Pyxel games in VS Code with no installation, and give AI agents the tools and skill to build them",
   "version": "0.9.0",
   "publisher": "kitao",
   "license": "MIT",
@@ -35,7 +35,8 @@
   },
   "icon": "media/icon.png",
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "AI"
   ],
   "keywords": [
     "pyxel",
@@ -43,7 +44,10 @@
     "game",
     "pixel-art",
     "python",
-    "gamedev"
+    "gamedev",
+    "mcp",
+    "agent",
+    "copilot"
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
@@ -250,9 +254,20 @@
           "type": "boolean",
           "default": true,
           "description": "Reload the running game when a file in the project folder is saved."
+        },
+        "pyxel.mcp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer the Pyxel MCP server (pyxel-mcp run through uvx) to AI agents in VS Code. Requires uv."
         }
       }
-    }
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "pyxel.mcp",
+        "label": "Pyxel"
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",
