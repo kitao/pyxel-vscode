@@ -293,7 +293,7 @@
           {
             "id": "run",
             "title": "Run a game",
-            "description": "Open a `.py` file and press the run button, or run the command.\n[Run](command:pyxel.run)",
+            "description": "Open a .py file and press the run button, or run the command.\n[Run](command:pyxel.run)",
             "media": {
               "markdown": "media/walkthrough/run.md"
             },
@@ -304,7 +304,7 @@
           {
             "id": "resources",
             "title": "Edit resources",
-            "description": "Open a `.pyxres` file in the Pyxel Editor, or create a new one.\n[New Resource](command:pyxel.newResource)",
+            "description": "Open a .pyxres file in the Pyxel Editor, or create a new one.\n[New Resource](command:pyxel.newResource)",
             "media": {
               "markdown": "media/walkthrough/resources.md"
             },
