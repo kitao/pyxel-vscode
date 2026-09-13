@@ -267,12 +267,18 @@
         "id": "pyxel.mcp",
         "label": "Pyxel"
       }
+    ],
+    "chatSkills": [
+      {
+        "path": "./skills/pyxel/SKILL.md"
+      }
     ]
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "lint": "eslint src",
+    "lint": "eslint src scripts",
     "package": "vsce package",
+    "sync-skill": "node scripts/sync-skill.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",

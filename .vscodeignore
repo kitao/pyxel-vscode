@@ -10,6 +10,7 @@ docs/**
 eslint.config.mjs
 node_modules/**
 package-lock.json
+scripts/**
 src/**
 tsconfig.json
 tsconfig.test.json
