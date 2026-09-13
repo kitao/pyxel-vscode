@@ -1,3 +1,14 @@
+## 1.0.0
+
+- Offer pyxel-mcp 1.3.0 to VS Code agent mode through uvx when uv is installed
+- Bundle the pyxel Agent Skill 1.4.0 so agents know how to build games
+- Add a Get Started walkthrough
+- Add the pyxel.mcp.enabled setting
+- Publish to the Marketplace and Open VSX from CI when publish tokens are set
+- Require VS Code 1.109 or newer
+- Add Dependabot, issue and pull request templates, and a security policy
+- Add an integration smoke test that runs the extension in VS Code
+
 ## 0.9.0
 
 - Make project file collection deterministic across file systems
