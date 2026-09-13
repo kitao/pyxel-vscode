@@ -2,7 +2,7 @@
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
   "description": "Run Pyxel games in VS Code with no installation, and give AI agents the tools and skill to build them",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {
