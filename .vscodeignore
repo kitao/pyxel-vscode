@@ -4,8 +4,10 @@
 .github/**
 .gitignore
 .superpowers/**
+.vscode-test/**
 .vscode/**
 CONTRIBUTING.md
+dist/test/**
 docs/**
 eslint.config.mjs
 node_modules/**

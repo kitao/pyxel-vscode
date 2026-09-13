@@ -23,3 +23,19 @@ jobs:
         with:
           name: vsix
           path: "*.vsix"
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('src/test/runTest.ts') }}
+      - run: npm ci
+      - name: Run the extension in the oldest supported VS Code
+        run: xvfb-run -a npm run test:integration

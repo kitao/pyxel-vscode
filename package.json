@@ -333,6 +333,7 @@
     "package": "vsce package",
     "sync-skill": "node scripts/sync-skill.mjs",
     "test": "vitest run",
+    "test:integration": "npm run compile && node dist/test/runTest.js",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "vscode:prepublish": "npm run compile",
