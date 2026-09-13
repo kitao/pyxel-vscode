@@ -11,3 +11,10 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      # Matches the Node runtime of the oldest supported VS Code.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Tracks engines.vscode and moves only when the minimum VS Code does.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
