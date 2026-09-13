@@ -1,0 +1,16 @@
+name: Feature request
+description: Propose an improvement to the extension.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task in VS Code that is slow, awkward, or impossible today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Commands, settings, or UI you expect. The extension runs the Pyxel Web runtime in a Webview and never installs Pyxel locally, so proposals that need a local Pyxel belong in the Pyxel repository.

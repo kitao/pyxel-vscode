@@ -3,12 +3,11 @@
 .claude/**
 .github/**
 .gitignore
-.superpowers/**
 .vscode-test/**
 .vscode/**
 CONTRIBUTING.md
+SECURITY.md
 dist/test/**
-docs/**
 eslint.config.mjs
 node_modules/**
 package-lock.json

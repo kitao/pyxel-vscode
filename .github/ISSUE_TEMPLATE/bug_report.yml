@@ -1,0 +1,38 @@
+name: Bug report
+description: Something in the extension does not behave as documented.
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Extension version, VS Code version, and OS.
+      placeholder: Pyxel 1.0.0, VS Code 1.109.0, macOS 15
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Run panel
+        - Pyxel Editor (.pyxres)
+        - Pyxel Player (.pyxapp)
+        - Copy Examples
+        - AI agent integration (MCP server or skill)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, what you expected, and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Pyxel output channel
+      description: Paste the relevant lines from the Pyxel output channel (View > Output > Pyxel).
+      render: text
