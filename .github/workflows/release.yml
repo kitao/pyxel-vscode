@@ -21,8 +21,8 @@ jobs:
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - name: Extract the release notes from the changelog
         run: |
-          awk -v v="${GITHUB_REF_NAME#v}" '$0 == "## " v {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
-          test -s notes.md
+          awk -v v="${GITHUB_REF_NAME#v}" '$0 == "## " v {on=1; next} /^## / {on=0} on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          test -s "$RUNNER_TEMP/notes.md"
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -37,6 +37,6 @@ jobs:
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: npx --yes ovsx@1.2.0 publish ./*.vsix --pat "$OVSX_PAT" --skip-duplicate
-      - run: gh release create "$GITHUB_REF_NAME" ./*.vsix --title "$GITHUB_REF_NAME" --notes-file notes.md
+      - run: gh release create "$GITHUB_REF_NAME" ./*.vsix --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
         env:
           GH_TOKEN: ${{ github.token }}
