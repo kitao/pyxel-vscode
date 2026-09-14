@@ -18,3 +18,7 @@ updates:
       # Tracks engines.vscode and moves only when the minimum VS Code does.
       - dependency-name: "@types/vscode"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # typescript-eslint pins typescript below 6.1, so a major here cannot
+      # install. Bump it by hand once typescript-eslint supports the release.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
