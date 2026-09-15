@@ -6,6 +6,7 @@ import type * as vscode from "vscode";
 import type { PyxelWebviewManager } from "../pyxelWebview";
 
 const vscodeState = vi.hoisted(() => ({
+  autoReload: true,
   createWebviewPanel: vi.fn(),
   showErrorMessage: vi.fn(),
   textDocuments: [] as vscode.TextDocument[],
@@ -23,7 +24,8 @@ vi.mock("vscode", () => ({
       return vscodeState.textDocuments;
     },
     getConfiguration: vi.fn(() => ({
-      get: vi.fn((_name: string, defaultValue: unknown) => defaultValue),
+      get: vi.fn((name: string, defaultValue: unknown) =>
+        name === "autoReload" ? vscodeState.autoReload : defaultValue),
     })),
   },
 }));
@@ -34,6 +36,7 @@ let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-run-test-"));
+  vscodeState.autoReload = true;
   vscodeState.createWebviewPanel.mockReset();
   vscodeState.showErrorMessage.mockReset();
   vscodeState.textDocuments = [];
@@ -121,5 +124,58 @@ describe("RunPanelController", () => {
     expect(harness.post).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(harness.post).toHaveBeenCalledOnce();
+  });
+
+  it("reuses the open panel for the next script", async () => {
+    const first = path.join(tmpDir, "first.py");
+    const second = path.join(tmpDir, "second.py");
+    fs.writeFileSync(first, "pass");
+    fs.writeFileSync(second, "pass");
+    const harness = createHarness();
+    await harness.controller.run({ fsPath: first } as vscode.Uri);
+    harness.ready();
+    harness.post.mockClear();
+
+    await harness.controller.run({ fsPath: second } as vscode.Uri);
+
+    expect(vscodeState.createWebviewPanel).toHaveBeenCalledOnce();
+    expect(harness.panel.title).toBe("Pyxel — second.py");
+    expect(harness.panel.reveal).toHaveBeenLastCalledWith(undefined, true);
+    expect(harness.post).toHaveBeenCalledWith(
+      harness.panel.webview,
+      expect.objectContaining({ command: "run", scriptName: "second.py" })
+    );
+  });
+
+  it("stops reloading once the panel is closed", async () => {
+    vi.useFakeTimers();
+    const scriptPath = path.join(tmpDir, "game.py");
+    fs.writeFileSync(scriptPath, "pass");
+    const harness = createHarness();
+    await harness.controller.run({ fsPath: scriptPath } as vscode.Uri);
+    harness.ready();
+    harness.post.mockClear();
+    harness.dispose();
+
+    harness.controller.handleFileSave(scriptPath);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(harness.post).not.toHaveBeenCalled();
+  });
+
+  it("leaves the game alone when auto-reload is off", async () => {
+    vi.useFakeTimers();
+    vscodeState.autoReload = false;
+    const scriptPath = path.join(tmpDir, "game.py");
+    fs.writeFileSync(scriptPath, "pass");
+    const harness = createHarness();
+    await harness.controller.run({ fsPath: scriptPath } as vscode.Uri);
+    harness.ready();
+    harness.post.mockClear();
+
+    harness.controller.handleFileSave(scriptPath);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(harness.post).not.toHaveBeenCalled();
   });
 });

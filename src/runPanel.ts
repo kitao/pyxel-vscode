@@ -1,16 +1,22 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { saveCapture } from "./fileOutput";
-import { PyxelWebviewManager } from "./pyxelWebview";
 import { collectFiles, isWatchedFile } from "./projectFiles";
+import { PyxelWebviewManager } from "./pyxelWebview";
 import { isPyxelRunnable, toErrorMessage } from "./utils";
 
 const RELOAD_DEBOUNCE_MS = 200;
 
+// What the panel is currently running. The three belong together: the panel
+// cannot reload without knowing the script, and neither outlives the panel.
+interface RunSession {
+  directory: string;
+  panel: vscode.WebviewPanel;
+  scriptName: string;
+}
+
 export class RunPanelController {
-  private panel: vscode.WebviewPanel | undefined;
-  private directory: string | undefined;
-  private scriptName: string | undefined;
+  private session: RunSession | undefined;
   private reloadTimer: NodeJS.Timeout | undefined;
 
   constructor(
@@ -20,11 +26,12 @@ export class RunPanelController {
 
   dispose(): void {
     this.cancelPendingReload();
-    this.panel?.dispose();
+    this.session?.panel.dispose();
   }
 
   handleFileSave(filePath: string): void {
-    if (this.directory && isWatchedFile(filePath, this.directory)) {
+    const session = this.session;
+    if (session && isWatchedFile(filePath, session.directory)) {
       this.scheduleReload();
     }
   }
@@ -57,19 +64,18 @@ export class RunPanelController {
       return;
     }
 
-    this.directory = directory;
-    this.scriptName = scriptName;
-    const isNew = !this.panel;
-    const panel = this.ensurePanel();
+    const running = this.session?.panel;
+    const panel = running ?? this.createPanel();
+    const session = { directory, panel, scriptName };
+    this.session = session;
     panel.title = `Pyxel — ${scriptName}`;
-    panel.reveal(isNew ? vscode.ViewColumn.Beside : undefined, true);
-    if (!isNew) this.sendRunMessage(panel, directory, scriptName);
+    panel.reveal(running ? undefined : vscode.ViewColumn.Beside, true);
+    // A new panel sends the project itself once the Webview reports ready.
+    if (running) this.sendRunMessage(session);
     this.cancelPendingReload();
   }
 
-  private ensurePanel(): vscode.WebviewPanel {
-    if (this.panel) return this.panel;
-
+  private createPanel(): vscode.WebviewPanel {
     const panel = vscode.window.createWebviewPanel(
       "pyxel.view",
       "Pyxel",
@@ -80,35 +86,27 @@ export class RunPanelController {
         localResourceRoots: [],
       }
     );
-    this.panel = panel;
     this.webviews.initialize(
       panel,
       () => {
-        if (this.directory && this.scriptName) {
-          this.sendRunMessage(panel, this.directory, this.scriptName);
-        }
+        if (this.session) this.sendRunMessage(this.session);
       },
-      (fileName, data) => saveCapture(this.directory, fileName, data)
+      (fileName, data) => saveCapture(this.session?.directory, fileName, data)
     );
     panel.onDidDispose(() => {
       this.cancelPendingReload();
-      this.panel = undefined;
-      this.directory = undefined;
-      this.scriptName = undefined;
+      this.session = undefined;
     });
     return panel;
   }
 
   private scheduleReload(): void {
-    if (!this.panel || !this.directory || !this.scriptName) return;
     const configuration = vscode.workspace.getConfiguration("pyxel");
     if (!configuration.get<boolean>("autoReload", true)) return;
     this.cancelPendingReload();
     this.reloadTimer = setTimeout(() => {
       this.reloadTimer = undefined;
-      if (this.panel && this.directory && this.scriptName) {
-        this.sendRunMessage(this.panel, this.directory, this.scriptName);
-      }
+      if (this.session) this.sendRunMessage(this.session);
     }, RELOAD_DEBOUNCE_MS);
   }
 
@@ -117,18 +115,18 @@ export class RunPanelController {
     this.reloadTimer = undefined;
   }
 
-  private sendRunMessage(
-    panel: vscode.WebviewPanel,
-    directory: string,
-    scriptName: string
-  ): void {
+  private sendRunMessage(session: RunSession): void {
     this.webviews.resetErrorState();
-    this.outputChannel.appendLine(`--- Run ${scriptName} ---`);
-    const { files, skipped } = collectFiles(directory);
+    this.outputChannel.appendLine(`--- Run ${session.scriptName} ---`);
+    const { files, skipped } = collectFiles(session.directory);
     for (const entry of skipped) {
       this.outputChannel.appendLine(`Skipped ${entry}`);
     }
-    this.webviews.post(panel.webview, { command: "run", scriptName, files });
+    this.webviews.post(session.panel.webview, {
+      command: "run",
+      scriptName: session.scriptName,
+      files,
+    });
   }
 
   private async saveDirtyDocuments(directory: string): Promise<boolean> {
