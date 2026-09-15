@@ -9,7 +9,6 @@ const vscodeState = vi.hoisted(() => ({
   commandHandlers: new Map<string, CommandHandler>(),
   createWebviewPanel: vi.fn(),
   executeCommand: vi.fn(),
-  registerMcpServerProvider: vi.fn(() => ({ dispose: vi.fn() })),
   showErrorMessage: vi.fn(),
   showSaveDialog: vi.fn(),
   textDocuments: [] as Array<{
@@ -19,10 +18,6 @@ const vscodeState = vi.hoisted(() => ({
     save: () => Promise<boolean>;
     uri: { fsPath: string };
   }>,
-}));
-
-vi.mock("../mcpServer", () => ({
-  registerMcpServerProvider: vscodeState.registerMcpServerProvider,
 }));
 
 vi.mock("vscode", () => ({
@@ -100,15 +95,6 @@ describe("activation", () => {
       "pyxel.newResource",
       "pyxel.run",
     ]);
-  });
-
-  it("registers the Pyxel MCP server provider with the output channel", () => {
-    activateExtension();
-
-    expect(vscodeState.registerMcpServerProvider).toHaveBeenCalledTimes(1);
-    expect(vscodeState.registerMcpServerProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ appendLine: expect.any(Function) })
-    );
   });
 });
 

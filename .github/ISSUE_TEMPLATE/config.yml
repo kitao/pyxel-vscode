@@ -3,6 +3,3 @@ contact_links:
   - name: Pyxel engine questions
     url: https://github.com/kitao/pyxel/discussions
     about: Questions about Pyxel itself rather than the VS Code extension.
-  - name: pyxel-mcp (agent observation tools)
-    url: https://github.com/kitao/pyxel-mcp/issues
-    about: Problems with the Pyxel MCP server that the extension registers for AI agents.

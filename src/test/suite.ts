@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import { MCP_PROVIDER_ID } from "../utils";
 
 const EXTENSION_ID = "kitao.pyxel-vscode";
 
@@ -32,16 +31,6 @@ export async function run(): Promise<void> {
   for (const command of extension.packageJSON.contributes.commands) {
     assert.ok(commands.has(command.command), `${command.command} is registered`);
   }
-
-  const providers = extension.packageJSON.contributes.mcpServerDefinitionProviders;
-  assert.deepStrictEqual(providers, [{ id: MCP_PROVIDER_ID, label: "Pyxel" }]);
-  assert.strictEqual(typeof vscode.lm.registerMcpServerDefinitionProvider, "function");
-  assert.strictEqual(typeof vscode.McpStdioServerDefinition, "function");
-
-  const [skill] = extension.packageJSON.contributes.chatSkills;
-  const skillPath = path.join(extension.extensionPath, skill.path);
-  assert.ok(fs.existsSync(skillPath), `bundled skill exists at ${skill.path}`);
-  assert.match(fs.readFileSync(skillPath, "utf8"), /^name: pyxel$/m);
 
   await vscode.commands.executeCommand(
     "workbench.action.openWalkthrough",

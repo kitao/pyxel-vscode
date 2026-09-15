@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { copyExamples } from "./copyExamples";
 import { createResource, PyxelFileProvider } from "./customEditors";
 import { createDocumentationCommand } from "./documentationPanels";
-import { registerMcpServerProvider } from "./mcpServer";
 import { PyxelWebviewManager } from "./pyxelWebview";
 import { RunPanelController } from "./runPanel";
 import { PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL } from "./utils";
@@ -56,8 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.workspace.onDidSaveTextDocument((document) =>
       controller.handleFileSave(document.uri.fsPath)
-    ),
-    registerMcpServerProvider(outputChannel)
+    )
   );
 }
 

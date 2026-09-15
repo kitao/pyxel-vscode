@@ -35,23 +35,13 @@ modules you change.
 
 CI also runs `npm run test:integration`, which downloads VS Code 1.109.0 into
 `.vscode-test/` and checks that the extension activates and registers its
-commands, custom editors, and MCP provider there. Run it yourself when you
+commands and custom editors there. Run it yourself when you
 change activation, `contributes`, or `src/test`.
 
-## Pinned upstream versions
+## Pinned upstream version
 
-The extension fetches or bundles three upstream projects:
-
-- `PYXEL_VERSION` in `src/utils.ts`: the Pyxel Web runtime loaded from
-  jsDelivr and the examples downloaded by `Pyxel: Copy Examples`.
-- `PYXEL_MCP_VERSION` in `src/utils.ts`: the exact `pyxel-mcp` release that
-  `uvx` runs for the MCP server offered to AI agents. An exact pin keeps the
-  server from changing underneath users, since uvx caches whatever satisfied
-  a requirement first.
-- `skills/pyxel/`: a [pyxel-skill](https://github.com/kitao/pyxel-skill)
-  release vendored by `npm run sync-skill -- <version>`, which fetches
-  `SKILL.md` and every reference it links from the release tag. The version
-  is recorded in the skill's own frontmatter.
+`PYXEL_VERSION` in `src/utils.ts` pins the Pyxel Web runtime loaded from
+jsDelivr and the examples downloaded by `Pyxel: Copy Examples`.
 
 Runtime upgrades are handled by the maintainer and verified by launching the
 Webview against the new runtime, not only by unit tests.

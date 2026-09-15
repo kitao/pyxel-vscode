@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import { MCP_PROVIDER_ID } from "../utils";
 
 const ROOT = path.join(__dirname, "..", "..");
 
@@ -13,14 +12,11 @@ type Step = {
 
 type PackageJson = {
   activationEvents: string[];
-  categories: string[];
   devDependencies: Record<string, string>;
   engines: { vscode: string };
   scripts: Record<string, string>;
   contributes: {
     commands: Array<{ command: string }>;
-    chatSkills: Array<{ path: string }>;
-    mcpServerDefinitionProviders: Array<{ id: string; label: string }>;
     walkthroughs: Array<{ steps: Step[] }>;
   };
 };
@@ -35,36 +31,13 @@ describe("package manifest", () => {
     expect(pkg.scripts.package).toBe("vsce package");
   });
 
-  it("targets the VS Code release that added skill and MCP contributions", () => {
+  it("keeps the API types in step with the oldest supported VS Code", () => {
     expect(pkg.engines.vscode).toBe("^1.109.0");
     expect(pkg.devDependencies["@types/vscode"]).toBe("~1.109.0");
-    expect(pkg.categories).toContain("AI");
   });
 
   it("lets VS Code derive activation from the contributions", () => {
     expect(pkg.activationEvents).toEqual([]);
-  });
-
-  it("registers the MCP server provider under the id used in code", () => {
-    expect(pkg.contributes.mcpServerDefinitionProviders).toEqual([
-      { id: MCP_PROVIDER_ID, label: "Pyxel" },
-    ]);
-  });
-
-  it("contributes a vendored pyxel skill whose references are all present", () => {
-    const [skill] = pkg.contributes.chatSkills;
-    const skillPath = path.join(ROOT, skill.path);
-    const skillDir = path.dirname(skillPath);
-    const text = fs.readFileSync(skillPath, "utf8");
-
-    expect(path.basename(skillDir)).toBe("pyxel");
-    expect(text).toMatch(/^name: pyxel$/m);
-    expect(text).toMatch(/^  version: "\d+\.\d+\.\d+"$/m);
-    const references = [...text.matchAll(/\]\((references\/[^)\s]+\.md)\)/g)].map((m) => m[1]);
-    expect(references.length).toBeGreaterThan(0);
-    for (const reference of new Set(references)) {
-      expect(fs.existsSync(path.join(skillDir, reference))).toBe(true);
-    }
   });
 
   it("ships walkthrough media and links only to contributed commands", () => {
@@ -85,9 +58,8 @@ describe("package manifest", () => {
     }
   });
 
-  it("keeps the skill and walkthrough media inside the package", () => {
+  it("keeps the walkthrough media inside the package", () => {
     const ignore = fs.readFileSync(path.join(ROOT, ".vscodeignore"), "utf8");
-    expect(ignore).not.toMatch(/^skills/m);
     expect(ignore).not.toMatch(/^media/m);
   });
 });

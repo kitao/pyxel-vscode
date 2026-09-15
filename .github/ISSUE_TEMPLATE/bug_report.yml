@@ -19,7 +19,6 @@ body:
         - Pyxel Editor (.pyxres)
         - Pyxel Player (.pyxapp)
         - Copy Examples
-        - AI agent integration (MCP server or skill)
         - Other
     validations:
       required: true
