@@ -59,16 +59,12 @@ Errors from the extension and the Pyxel runtime are written to **View › Output
 › Pyxel**. Include those lines when you
 [open an issue](https://github.com/kitao/pyxel-vscode/issues).
 
-## Related projects
-
-- [Pyxel](https://github.com/kitao/pyxel) — the retro game engine for Python.
-
 ## Development
 
 ```bash
 npm install              # install dependencies
 npm run compile          # build to dist/
-npm run watch            # rebuild on change
+npm run watch            # rebuild the extension host on change
 npm test                 # unit tests (vitest)
 npm run test:integration # start the extension in VS Code
 npm run lint             # ESLint
