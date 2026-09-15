@@ -10,7 +10,7 @@ export const PYXEL_API_REFERENCE_URL =
 export const PYXEL_EDITOR_MANUAL_URL =
   "https://kitao.github.io/pyxel/web/editor-manual/";
 
-export const SKIP_DIRS = new Set([
+const SKIP_DIRS = new Set([
   ".git", "__pycache__", "node_modules", ".venv", "venv", ".tox", ".mypy_cache",
 ]);
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
