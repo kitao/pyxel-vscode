@@ -41,14 +41,16 @@ runtime, not only by unit tests.
 
 1. Bump `version` in `package.json` (`npm install --package-lock-only` syncs
    the lockfile) and add a `## x.y.z` section to `CHANGELOG.md`.
-2. Run the checks above, then `rm -f *.vsix && npm run package`.
-3. Upload the `.vsix` to the
-   [Marketplace publisher page](https://marketplace.visualstudio.com/manage/publishers/kitao)
-   and wait until `npx vsce show kitao.pyxel-vscode` reports the new version.
-4. Commit, tag `vX.Y.Z`, and push the tag.
+2. Run the checks above, then commit.
+3. Tag `vX.Y.Z` and push the tag.
+4. The release workflow verifies that the tag matches `package.json` and that
+   the changelog has a section for it, runs the checks, builds the `.vsix`,
+   and creates a GitHub Release with it and that section as notes.
+5. Download the `.vsix` from the release, list its contents with `unzip -Z1`,
+   and upload that same file to the
+   [Marketplace publisher page](https://marketplace.visualstudio.com/manage/publishers/kitao).
+6. Wait until `npx vsce show kitao.pyxel-vscode` reports the new version.
 
-The release workflow verifies that the tag matches `package.json` and that the
-changelog has a section for it, runs the checks, and creates a GitHub Release
-with the `.vsix` and that section as notes. Publishing to the Marketplace is a
-manual upload, so it happens before the tag and the GitHub Release never
-points at a version that is not installable.
+Publishing is a manual upload, so the release and the Marketplace are a few
+minutes apart. Uploading the file the workflow built keeps the `.vsix` on the
+release and the one users install byte for byte the same.
