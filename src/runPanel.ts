@@ -18,6 +18,7 @@ interface RunSession {
 export class RunPanelController {
   private session: RunSession | undefined;
   private reloadTimer: NodeJS.Timeout | undefined;
+  private pendingRun: symbol | undefined;
 
   constructor(
     private readonly webviews: PyxelWebviewManager,
@@ -25,11 +26,15 @@ export class RunPanelController {
   ) {}
 
   dispose(): void {
+    this.pendingRun = undefined;
     this.cancelPendingReload();
     this.session?.panel.dispose();
+    this.session = undefined;
   }
 
   handleFileSave(filePath: string): void {
+    // Run sends one complete snapshot after all of its saves succeed.
+    if (this.pendingRun) return;
     const session = this.session;
     if (session && isWatchedFile(filePath, session.directory)) {
       this.scheduleReload();
@@ -47,16 +52,23 @@ export class RunPanelController {
 
     const directory = path.dirname(filePath);
     const scriptName = path.basename(filePath);
+    const request = Symbol();
+    this.pendingRun = request;
+    this.cancelPendingReload();
     let saved: boolean;
     try {
       saved = await this.saveDirtyDocuments(directory);
     } catch (error: unknown) {
+      if (request !== this.pendingRun) return;
+      this.pendingRun = undefined;
       vscode.window.showErrorMessage(
         "Failed to save project files before running with Pyxel: " +
         toErrorMessage(error)
       );
       return;
     }
+    if (request !== this.pendingRun) return;
+    this.pendingRun = undefined;
     if (!saved) {
       vscode.window.showErrorMessage(
         "Failed to save project files before running with Pyxel."
@@ -67,12 +79,11 @@ export class RunPanelController {
     const running = this.session?.panel;
     const panel = running ?? this.createPanel();
     const session = { directory, panel, scriptName };
+    // Keep the current session if the requested script cannot be collected.
+    if (running && !this.sendRunMessage(session)) return;
     this.session = session;
     panel.title = `Pyxel — ${scriptName}`;
     panel.reveal(running ? undefined : vscode.ViewColumn.Beside, true);
-    // A new panel sends the project itself once the Webview reports ready.
-    if (running) this.sendRunMessage(session);
-    this.cancelPendingReload();
   }
 
   private createPanel(): vscode.WebviewPanel {
@@ -89,11 +100,12 @@ export class RunPanelController {
     this.webviews.initialize(
       panel,
       () => {
-        if (this.session) this.sendRunMessage(this.session);
+        if (this.session?.panel === panel) this.sendRunMessage(this.session);
       },
       (fileName, data) => saveCapture(this.session?.directory, fileName, data)
     );
     panel.onDidDispose(() => {
+      this.pendingRun = undefined;
       this.cancelPendingReload();
       this.session = undefined;
     });
@@ -115,18 +127,27 @@ export class RunPanelController {
     this.reloadTimer = undefined;
   }
 
-  private sendRunMessage(session: RunSession): void {
-    this.webviews.resetErrorState(session.panel.webview);
+  private sendRunMessage(session: RunSession): boolean {
+    if (this.pendingRun) return false;
     this.outputChannel.appendLine(`--- Run ${session.scriptName} ---`);
     const { files, skipped } = collectFiles(session.directory);
     for (const entry of skipped) {
       this.outputChannel.appendLine(`Skipped ${entry}`);
     }
+    if (!Object.hasOwn(files, session.scriptName)) {
+      const message = `${session.scriptName} was not included in the Pyxel project. ` +
+        "Check that the file exists and is within the project file limits. See Output > Pyxel for details.";
+      this.outputChannel.appendLine(message);
+      vscode.window.showErrorMessage(message);
+      return false;
+    }
+    this.webviews.resetErrorState(session.panel.webview);
     this.webviews.post(session.panel.webview, {
       command: "run",
       scriptName: session.scriptName,
       files,
     });
+    return true;
   }
 
   private async saveDirtyDocuments(directory: string): Promise<boolean> {
@@ -136,9 +157,12 @@ export class RunPanelController {
         !document.isUntitled &&
         isWatchedFile(document.uri.fsPath, directory)
     );
-    const results = await Promise.all(
-      documents.map((document) => document.save())
+    // A rejected save must not leave sibling saves firing reload events later.
+    const results = await Promise.allSettled(
+      documents.map(async (document) => document.save())
     );
-    return results.every(Boolean);
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw new Error(toErrorMessage(failure.reason));
+    return results.every((result) => result.status === "fulfilled" && result.value);
   }
 }
