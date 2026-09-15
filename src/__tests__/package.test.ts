@@ -32,8 +32,8 @@ describe("package manifest", () => {
   });
 
   it("keeps the API types in step with the oldest supported VS Code", () => {
-    expect(pkg.engines.vscode).toBe("^1.109.0");
-    expect(pkg.devDependencies["@types/vscode"]).toBe("~1.109.0");
+    expect(pkg.engines.vscode).toBe("^1.85.0");
+    expect(pkg.devDependencies["@types/vscode"]).toBe("~1.85.0");
   });
 
   it("lets VS Code derive activation from the contributions", () => {
