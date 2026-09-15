@@ -5,17 +5,19 @@ import { PyxelWebviewManager } from "../pyxelWebview";
 interface PanelHarness {
   dispose: () => void;
   message: (value: unknown) => void;
+  setActive: (active: boolean) => void;
   panel: vscode.WebviewPanel;
   postMessage: ReturnType<typeof vi.fn>;
 }
 
 function createPanel(active = false): PanelHarness {
   let disposeHandler = () => {};
+  let stateHandler = () => {};
   let messageHandler = (_value: unknown) => {};
   const postMessage = vi.fn();
   const panel = {
     active,
-    onDidChangeViewState: vi.fn(),
+    onDidChangeViewState: vi.fn((handler: () => void) => { stateHandler = handler; }),
     onDidDispose: vi.fn((handler: () => void) => {
       disposeHandler = handler;
       return { dispose: vi.fn() };
@@ -33,6 +35,10 @@ function createPanel(active = false): PanelHarness {
   } as unknown as vscode.WebviewPanel;
   return {
     dispose: () => disposeHandler(),
+    setActive: (active) => {
+      Object.assign(panel, { active });
+      stateHandler();
+    },
     message: (value) => messageHandler(value),
     panel,
     postMessage,
@@ -98,7 +104,7 @@ describe("PyxelWebviewManager", () => {
 
     harness.message({ command: "error", message: "first" });
     harness.message({ command: "error", message: "second" });
-    manager.resetErrorState();
+    manager.resetErrorState(harness.panel.webview);
     harness.message({ command: "error", message: "third" });
 
     expect(appendLine).toHaveBeenCalledTimes(3);
@@ -123,5 +129,44 @@ describe("PyxelWebviewManager", () => {
       key: "s",
       shift: false,
     });
+  });
+
+  it("does not send a shortcut to a panel after it loses focus", () => {
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const harness = createPanel(true);
+    manager.initialize(harness.panel, vi.fn());
+    harness.setActive(false);
+
+    manager.forwardKey({ code: "KeyS", key: "s" });
+
+    expect(harness.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("shows errors independently for each panel", () => {
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const first = createPanel();
+    const second = createPanel();
+    manager.initialize(first.panel, vi.fn());
+    manager.initialize(second.panel, vi.fn());
+
+    first.message({ command: "error", message: "first panel" });
+    second.message({ command: "error", message: "second panel" });
+    second.message({ command: "error", message: "repeat" });
+
+    expect(show).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a rejected message delivery without an unhandled rejection", async () => {
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const harness = createPanel();
+    harness.postMessage.mockRejectedValue(new Error("panel closed"));
+
+    manager.post(harness.panel.webview, {
+      command: "key", code: "KeyS", key: "s", shift: false,
+    });
+
+    await vi.waitFor(() => expect(appendLine).toHaveBeenCalledWith(
+      "Failed to send to Pyxel: panel closed"
+    ));
   });
 });

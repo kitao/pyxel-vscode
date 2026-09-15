@@ -116,7 +116,7 @@ export class RunPanelController {
   }
 
   private sendRunMessage(session: RunSession): void {
-    this.webviews.resetErrorState();
+    this.webviews.resetErrorState(session.panel.webview);
     this.outputChannel.appendLine(`--- Run ${session.scriptName} ---`);
     const { files, skipped } = collectFiles(session.directory);
     for (const entry of skipped) {

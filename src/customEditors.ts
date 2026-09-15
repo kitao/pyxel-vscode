@@ -72,7 +72,7 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
     filePath: string,
     build: () => HostToWebviewMessage
   ): void {
-    this.webviews.resetErrorState();
+    this.webviews.resetErrorState(panel.webview);
     try {
       this.webviews.post(panel.webview, build());
     } catch (error: unknown) {

@@ -11,7 +11,7 @@ interface ForwardKeyArgs {
 
 export class PyxelWebviewManager {
   private activeWebview: vscode.Webview | undefined;
-  private errorPanelShown = false;
+  private readonly errorPanelsShown = new WeakSet<vscode.Webview>();
 
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
@@ -28,6 +28,7 @@ export class PyxelWebviewManager {
       panel.webview.html = getWebviewHtml(this.loadScript());
     } catch (error: unknown) {
       this.reportError(
+        panel.webview,
         `Failed to load the Pyxel Webview script: ${toErrorMessage(error)}`
       );
       return;
@@ -50,7 +51,7 @@ export class PyxelWebviewManager {
           panel.title = message.title;
           break;
         case "error":
-          this.reportError(message.message);
+          this.reportError(panel.webview, message.message);
           break;
         case "saved":
           if (!onSaved) break;
@@ -67,7 +68,9 @@ export class PyxelWebviewManager {
   }
 
   post(webview: vscode.Webview, message: HostToWebviewMessage): void {
-    webview.postMessage(message);
+    void Promise.resolve(webview.postMessage(message)).catch((error: unknown) => {
+      this.reportError(webview, `Failed to send to Pyxel: ${toErrorMessage(error)}`);
+    });
   }
 
   forwardKey(args: unknown): void {
@@ -80,21 +83,25 @@ export class PyxelWebviewManager {
     });
   }
 
-  resetErrorState(): void {
-    this.errorPanelShown = false;
+  resetErrorState(webview: vscode.Webview): void {
+    this.errorPanelsShown.delete(webview);
   }
 
-  private reportError(message: string): void {
+  private reportError(webview: vscode.Webview, message: string): void {
     this.outputChannel.appendLine(message);
-    if (this.errorPanelShown) return;
-    this.errorPanelShown = true;
+    if (this.errorPanelsShown.has(webview)) return;
+    this.errorPanelsShown.add(webview);
     this.outputChannel.show(true);
   }
 
   private track(panel: vscode.WebviewPanel): void {
     if (panel.active) this.activeWebview = panel.webview;
     panel.onDidChangeViewState(() => {
-      if (panel.active) this.activeWebview = panel.webview;
+      if (panel.active) {
+        this.activeWebview = panel.webview;
+      } else if (this.activeWebview === panel.webview) {
+        this.activeWebview = undefined;
+      }
     });
     panel.onDidDispose(() => {
       if (this.activeWebview === panel.webview) {
