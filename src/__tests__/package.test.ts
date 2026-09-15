@@ -4,12 +4,6 @@ import * as path from "path";
 
 const ROOT = path.join(__dirname, "..", "..");
 
-type Step = {
-  description: string;
-  media: { markdown: string };
-  completionEvents?: string[];
-};
-
 type PackageJson = {
   activationEvents: string[];
   devDependencies: Record<string, string>;
@@ -17,7 +11,6 @@ type PackageJson = {
   scripts: Record<string, string>;
   contributes: {
     commands: Array<{ command: string }>;
-    walkthroughs: Array<{ steps: Step[] }>;
   };
 };
 
@@ -38,28 +31,5 @@ describe("package manifest", () => {
 
   it("lets VS Code derive activation from the contributions", () => {
     expect(pkg.activationEvents).toEqual([]);
-  });
-
-  it("ships walkthrough media and links only to contributed commands", () => {
-    const commands = new Set(pkg.contributes.commands.map((entry) => entry.command));
-    for (const walkthrough of pkg.contributes.walkthroughs) {
-      for (const step of walkthrough.steps) {
-        expect(fs.existsSync(path.join(ROOT, step.media.markdown))).toBe(true);
-        const linked = [...step.description.matchAll(/command:([\w.]+)/g)].map(
-          (match) => match[1]
-        );
-        const completed = (step.completionEvents ?? [])
-          .filter((event) => event.startsWith("onCommand:"))
-          .map((event) => event.slice("onCommand:".length));
-        for (const command of [...linked, ...completed]) {
-          expect(commands.has(command)).toBe(true);
-        }
-      }
-    }
-  });
-
-  it("keeps the walkthrough media inside the package", () => {
-    const ignore = fs.readFileSync(path.join(ROOT, ".vscodeignore"), "utf8");
-    expect(ignore).not.toMatch(/^media/m);
   });
 });

@@ -32,11 +32,6 @@ export async function run(): Promise<void> {
     assert.ok(commands.has(command.command), `${command.command} is registered`);
   }
 
-  await vscode.commands.executeCommand(
-    "workbench.action.openWalkthrough",
-    `${EXTENSION_ID}#pyxel.gettingStarted`
-  );
-
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-smoke-"));
   const script = path.join(directory, "game.py");
   fs.writeFileSync(script, "import pyxel\n");

@@ -28,9 +28,6 @@ files.
 
 ## Getting started
 
-Open **Help › Welcome** and pick **Get Started with Pyxel** under Walkthroughs
-for a guided tour, or:
-
 1. Run `Pyxel: Copy Examples` from the command palette and pick a folder.
 2. Open `pyxel_examples/01_hello_pyxel.py`.
 3. Press the run button, or run `Pyxel: Run`. The game opens in a panel.

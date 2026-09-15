@@ -252,49 +252,7 @@
           "description": "Reload the running game when a file in the project folder is saved."
         }
       }
-    },
-    "walkthroughs": [
-      {
-        "id": "pyxel.gettingStarted",
-        "title": "Get Started with Pyxel",
-        "description": "Run, edit, and play retro games without installing anything.",
-        "steps": [
-          {
-            "id": "copyExamples",
-            "title": "Copy the examples",
-            "description": "Download the official Pyxel examples into a folder of your choice.\n[Copy Examples](command:pyxel.copyExamples)",
-            "media": {
-              "markdown": "media/walkthrough/copy-examples.md"
-            },
-            "completionEvents": [
-              "onCommand:pyxel.copyExamples"
-            ]
-          },
-          {
-            "id": "run",
-            "title": "Run a game",
-            "description": "Open a .py file and press the run button, or run the command.\n[Run](command:pyxel.run)",
-            "media": {
-              "markdown": "media/walkthrough/run.md"
-            },
-            "completionEvents": [
-              "onCommand:pyxel.run"
-            ]
-          },
-          {
-            "id": "resources",
-            "title": "Edit resources",
-            "description": "Open a .pyxres file in the Pyxel Editor, or create a new one.\n[New Resource](command:pyxel.newResource)",
-            "media": {
-              "markdown": "media/walkthrough/resources.md"
-            },
-            "completionEvents": [
-              "onCommand:pyxel.newResource"
-            ]
-          }
-        ]
-      }
-    ]
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",
