@@ -26,7 +26,7 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
     _token: vscode.CancellationToken
   ): void {
     const filePath = document.uri.fsPath;
-    const isResource = path.extname(filePath) === ".pyxres";
+    const isResource = path.extname(filePath).toLowerCase() === ".pyxres";
     const directory = path.dirname(filePath);
 
     this.webviews.initialize(
@@ -49,7 +49,7 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
   }
 
   private sendEditMessage(panel: vscode.WebviewPanel, filePath: string): void {
-    const palettePath = filePath.replace(/\.pyxres$/, ".pyxpal");
+    const palettePath = filePath.replace(/\.pyxres$/i, ".pyxpal");
     this.send(panel, filePath, () => ({
       command: "edit",
       fileName: path.basename(filePath),

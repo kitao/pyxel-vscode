@@ -92,6 +92,22 @@ describe("Pyxel Editor (.pyxres)", () => {
     });
   });
 
+  it("edits an uppercase resource extension with its palette", () => {
+    const filePath = path.join(tmpDir, "game.PYXRES");
+    fs.writeFileSync(filePath, "resource");
+    fs.writeFileSync(path.join(tmpDir, "game.pyxpal"), "palette");
+    const harness = createHarness(filePath);
+
+    harness.ready();
+
+    expect(harness.post).toHaveBeenCalledWith(harness.panel.webview, {
+      command: "edit",
+      fileName: "game.PYXRES",
+      fileData: base64("resource"),
+      palData: base64("palette"),
+    });
+  });
+
   it("sends a null palette when none exists, and null data for a new file", () => {
     const filePath = path.join(tmpDir, "new.pyxres");
     const harness = createHarness(filePath);
