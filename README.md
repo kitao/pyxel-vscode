@@ -77,7 +77,7 @@ npm run package          # build the .vsix
 ```
 
 Press `F5` in VS Code to launch an Extension Development Host. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the release process.
+[DEVELOPMENT.md](DEVELOPMENT.md) for the release process.
 
 ## License
 

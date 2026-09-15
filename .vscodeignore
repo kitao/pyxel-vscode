@@ -5,7 +5,7 @@
 .gitignore
 .vscode-test/**
 .vscode/**
-CONTRIBUTING.md
+DEVELOPMENT.md
 dist/test/**
 eslint.config.mjs
 node_modules/**

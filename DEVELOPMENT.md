@@ -1,14 +1,6 @@
-# Contributing
+# Development
 
-Thanks for your interest in improving the Pyxel VS Code extension!
-
-## Reporting issues
-
-Use the bug report form at <https://github.com/kitao/pyxel-vscode/issues>.
-It asks for the extension and VS Code versions, your OS, the steps you took,
-and the relevant lines from the Pyxel output channel.
-
-## Development setup
+## Setup
 
 ```bash
 git clone https://github.com/kitao/pyxel-vscode.git
@@ -20,7 +12,7 @@ npm run compile
 Press `F5` in VS Code to launch an Extension Development Host with the
 extension loaded.
 
-## Before submitting a pull request
+## Checks
 
 ```bash
 npm run lint
@@ -29,22 +21,21 @@ npm test
 npm run package
 ```
 
-All four must pass (CI runs the same checks). Keep changes focused, follow
-the existing code style, and add or update tests in `src/__tests__` for the
-modules you change.
+All four must pass before committing, and CI runs the same ones. Add or
+update tests in `src/__tests__` for the modules you change.
 
-CI also runs `npm run test:integration`, which downloads VS Code 1.109.0 into
+CI also runs `npm run test:integration`, which downloads VS Code into
 `.vscode-test/` and checks that the extension activates and registers its
-commands and custom editors there. Run it yourself when you
-change activation, `contributes`, or `src/test`.
+commands in a real editor. Run it yourself when you change activation,
+`contributes`, or `src/test`.
 
 ## Pinned upstream version
 
 `PYXEL_VERSION` in `src/utils.ts` pins the Pyxel Web runtime loaded from
 jsDelivr and the examples downloaded by `Pyxel: Copy Examples`.
 
-Runtime upgrades are handled by the maintainer and verified by launching the
-Webview against the new runtime, not only by unit tests.
+Runtime upgrades are verified by launching the Webview against the new
+runtime, not only by unit tests.
 
 ## Releasing
 
