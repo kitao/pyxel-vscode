@@ -40,6 +40,16 @@ describe("collectFiles", () => {
     );
   });
 
+  it("preserves file names that are also Object prototype properties", () => {
+    writeFile("__proto__", "asset");
+    writeFile("constructor", "constructor asset");
+
+    const { files } = collectFiles(tmpDir);
+    const serialized = JSON.parse(JSON.stringify(files)) as Record<string, string>;
+    expect(Object.keys(serialized)).toEqual(["__proto__", "constructor"]);
+    expect(Buffer.from(serialized["__proto__"], "base64").toString()).toBe("asset");
+  });
+
   it("collects files in subdirectories", () => {
     writeFile("sub/a.py", "a");
     writeFile("sub/b.txt", "b");

@@ -29,7 +29,7 @@ export function isWatchedFile(savedPath: string, rootDir: string): boolean {
 }
 
 export function collectFiles(rootDir: string): CollectedFiles {
-  const files: Record<string, string> = {};
+  const files = Object.create(null) as Record<string, string>;
   const skipped: string[] = [];
   let totalSize = 0;
   let truncated = false;
