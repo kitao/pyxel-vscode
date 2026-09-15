@@ -5,7 +5,8 @@ import {
   keySteps,
   PyxelRunner,
   RUNTIME_LOAD_ERROR,
-  staleFiles,
+  start,
+  RUN_SCRIPT,
   toErrorMessage,
   type HostMessage,
   type RunnerHost,
@@ -18,21 +19,6 @@ describe("message protocol", () => {
   it("matches the host side in both directions", () => {
     expectTypeOf<HostMessage>().toEqualTypeOf<HostToWebviewMessage>();
     expectTypeOf<WebviewMessage>().toEqualTypeOf<WebviewToHostMessage>();
-  });
-});
-
-describe("staleFiles", () => {
-  it("lists files the previous run had and the new one does not", () => {
-    expect(staleFiles(["a.py", "old.py"], { "a.py": "", "b.py": "" }))
-      .toEqual(["old.py"]);
-  });
-
-  it("keeps files whose contents are an empty string", () => {
-    expect(staleFiles(["a.py"], { "a.py": "" })).toEqual([]);
-  });
-
-  it("is empty for the first run", () => {
-    expect(staleFiles([], { "a.py": "" })).toEqual([]);
   });
 });
 
@@ -169,5 +155,52 @@ describe("PyxelRunner", () => {
     expect(host.reportError)
       .toHaveBeenCalledWith("Failed to reset Pyxel: stuck");
     expect(reset).toHaveBeenLastCalledWith("third");
+  });
+});
+
+describe("Webview runtime messages", () => {
+  it("keeps each launch's files intact while newer requests are queued", async () => {
+    let receive = (_event: { data: HostMessage }) => {};
+    let finishLaunch = () => {};
+    const view = {
+      addEventListener: (_name: string, listener: typeof receive) => {
+        receive = listener;
+      },
+      pyxelContext: { params: { script: "" } },
+      _pendingFiles: undefined as Record<string, string> | undefined,
+      _pendingScriptName: undefined as string | undefined,
+    };
+    const launch = vi.fn(() => new Promise<void>((resolve) => {
+      finishLaunch = resolve;
+    }));
+    const reset = vi.fn(async () => {});
+    const originalConsoleError = console.error;
+    vi.stubGlobal("acquireVsCodeApi", () => ({ postMessage: vi.fn() }));
+    vi.stubGlobal("launchPyxel", launch);
+    vi.stubGlobal("resetPyxel", reset);
+    vi.stubGlobal("window", view);
+    vi.stubGlobal("document", {
+      body: {}, head: {}, querySelector: () => null,
+    });
+    vi.stubGlobal("MutationObserver", class { observe() {} });
+    try {
+      start();
+      receive({ data: { command: "run", scriptName: "first.py", files: { "first.py": "first" } } });
+      receive({ data: { command: "edit", fileName: "unused.pyxres", fileData: null, palData: null } });
+      receive({ data: { command: "run", scriptName: "last.py", files: { "last.py": "last" } } });
+
+      expect(view._pendingScriptName).toBe("first.py");
+      expect(view._pendingFiles).toEqual({ "first.py": "first" });
+      finishLaunch();
+      await vi.waitFor(() => expect(reset).toHaveBeenCalledOnce());
+      expect(view._pendingScriptName).toBe("last.py");
+      expect(view._pendingFiles).toEqual({ "last.py": "last" });
+      expect(view.pyxelContext.params.script).toBe(RUN_SCRIPT);
+    } finally {
+      finishLaunch();
+      await vi.waitFor(() => expect(reset).toHaveBeenCalledOnce());
+      console.error = originalConsoleError;
+      vi.unstubAllGlobals();
+    }
   });
 });

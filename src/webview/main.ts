@@ -42,7 +42,6 @@ declare global {
     pyxelContext?: PyxelContext;
     _pendingFiles?: Record<string, string>;
     _pendingScriptName?: string;
-    _staleFiles?: string[];
     _pendingFileName?: string;
     _pendingFileData?: string | null;
     _pendingPalData?: string | null;
@@ -52,17 +51,13 @@ declare global {
 
 // File names reach Python as data (js.window globals) instead of being
 // interpolated into the source, so any file name is injection-safe.
+// resetPyxel clears the working directory before this script runs again.
 export const RUN_SCRIPT = `
 import base64
 import js
 import os
 import pyxel.cli
 
-for name in js.window._staleFiles.to_py():
-    try:
-        os.remove(name)
-    except OSError:
-        pass
 files = js.window._pendingFiles.to_py()
 for name, b64 in files.items():
     if '/' in name:
@@ -85,7 +80,7 @@ if file_data:
         f.write(data)
 pal_data = js.window._pendingPalData
 if pal_data:
-    if name.endswith('.pyxres'):
+    if name.lower().endswith('.pyxres'):
         pal_name = name[:-7] + '.pyxpal'
     else:
         pal_name = name + '.pyxpal'
@@ -115,16 +110,6 @@ export const KEY_RELEASE_DELAY_MS = 80;
 export function toErrorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null | undefined)?.message;
   return typeof message === "string" && message ? message : String(error);
-}
-
-// Files from the previous run that the new one no longer provides.
-export function staleFiles(
-  previous: string[],
-  files: Record<string, string>
-): string[] {
-  return previous.filter(
-    (name) => !Object.prototype.hasOwnProperty.call(files, name)
-  );
 }
 
 // String.fromCharCode takes the bytes as arguments, so they go in chunks.
@@ -184,37 +169,35 @@ export interface RunnerHost {
 export class PyxelRunner {
   private started = false;
   private busy = false;
-  private queued: string | null = null;
+  private queued: { script: string; prepare: () => void } | null = null;
 
   constructor(private readonly host: RunnerHost) {}
 
-  async run(script: string): Promise<void> {
+  async run(script: string, prepare: () => void = () => {}): Promise<void> {
     if (!this.host.isRuntimeLoaded()) {
       this.host.reportFatal(RUNTIME_LOAD_ERROR);
       return;
     }
     if (this.busy) {
-      this.queued = script;
+      this.queued = { script, prepare };
       return;
     }
 
     this.busy = true;
+    const operation = this.started ? "reset" : "launch";
     try {
+      // Publish the payload only when this request starts. A later message
+      // must not change the globals while launch/reset is still using them.
+      prepare();
       if (this.started) {
-        try {
-          await this.host.reset(script);
-        } catch (error: unknown) {
-          this.host.reportError("Failed to reset Pyxel: " + toErrorMessage(error));
-        }
+        await this.host.reset(script);
       } else {
         this.host.installSaveBridge();
-        try {
-          await this.host.launch(script);
-          this.started = true;
-        } catch (error: unknown) {
-          this.host.reportError("Failed to launch Pyxel: " + toErrorMessage(error));
-        }
+        await this.host.launch(script);
+        this.started = true;
       }
+    } catch (error: unknown) {
+      this.host.reportError(`Failed to ${operation} Pyxel: ${toErrorMessage(error)}`);
     } finally {
       this.busy = false;
     }
@@ -222,7 +205,7 @@ export class PyxelRunner {
     // A failed launch leaves nothing to reset, so drop what was queued.
     const next = this.queued;
     this.queued = null;
-    if (this.started && next !== null) await this.run(next);
+    if (this.started && next !== null) await this.run(next.script, next.prepare);
   }
 }
 
@@ -292,8 +275,6 @@ export function start(): void {
     if (document.getElementById("pyxel-prompt")) document.body.click();
   }).observe(document.body, { childList: true, subtree: true });
 
-  let previousRunFiles: string[] = [];
-
   const dispatch = (step: KeyStep) => {
     document.dispatchEvent(new KeyboardEvent(step.type, {
       bubbles: true,
@@ -309,22 +290,23 @@ export function start(): void {
     if (!message || typeof message !== "object") return;
     switch (message.command) {
       case "run":
-        window._pendingFiles = message.files;
-        window._pendingScriptName = message.scriptName;
-        window._staleFiles = staleFiles(previousRunFiles, message.files);
-        previousRunFiles = Object.keys(message.files);
-        void runner.run(RUN_SCRIPT);
+        void runner.run(RUN_SCRIPT, () => {
+          window._pendingFiles = message.files;
+          window._pendingScriptName = message.scriptName;
+        });
         break;
       case "edit":
-        window._pendingFileName = message.fileName;
-        window._pendingFileData = message.fileData;
-        window._pendingPalData = message.palData;
-        void runner.run(EDIT_SCRIPT);
+        void runner.run(EDIT_SCRIPT, () => {
+          window._pendingFileName = message.fileName;
+          window._pendingFileData = message.fileData;
+          window._pendingPalData = message.palData;
+        });
         break;
       case "play":
-        window._pendingFileName = message.fileName;
-        window._pendingFileData = message.fileData;
-        void runner.run(PLAY_SCRIPT);
+        void runner.run(PLAY_SCRIPT, () => {
+          window._pendingFileName = message.fileName;
+          window._pendingFileData = message.fileData;
+        });
         break;
       case "key": {
         const { press, release } = keySteps(message);
