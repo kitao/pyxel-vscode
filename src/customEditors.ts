@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { saveCapture, writeResource } from "./fileOutput";
+import type { HostToWebviewMessage } from "./messages";
 import { PyxelWebviewManager } from "./pyxelWebview";
 import { toErrorMessage } from "./utils";
 
@@ -48,45 +49,44 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
   }
 
   private sendEditMessage(panel: vscode.WebviewPanel, filePath: string): void {
-    this.webviews.resetErrorState();
-    const fileName = path.basename(filePath);
-    try {
-      const fileData = fs.existsSync(filePath)
-        ? fs.readFileSync(filePath).toString("base64")
-        : null;
-      const palettePath = filePath.replace(/\.pyxres$/, ".pyxpal");
-      const paletteData = fs.existsSync(palettePath)
-        ? fs.readFileSync(palettePath).toString("base64")
-        : null;
-      this.webviews.post(panel.webview, {
-        command: "edit",
-        fileName,
-        fileData,
-        palData: paletteData,
-      });
-    } catch (error: unknown) {
-      vscode.window.showErrorMessage(
-        `Failed to read ${fileName}: ${toErrorMessage(error)}`
-      );
-    }
+    const palettePath = filePath.replace(/\.pyxres$/, ".pyxpal");
+    this.send(panel, filePath, () => ({
+      command: "edit",
+      fileName: path.basename(filePath),
+      fileData: readBase64(filePath),
+      palData: readBase64(palettePath),
+    }));
   }
 
   private sendPlayMessage(panel: vscode.WebviewPanel, filePath: string): void {
+    this.send(panel, filePath, () => ({
+      command: "play",
+      fileName: path.basename(filePath),
+      fileData: fs.readFileSync(filePath).toString("base64"),
+    }));
+  }
+
+  // Reading happens inside the callback so a failure never reaches the Webview.
+  private send(
+    panel: vscode.WebviewPanel,
+    filePath: string,
+    build: () => HostToWebviewMessage
+  ): void {
     this.webviews.resetErrorState();
-    const fileName = path.basename(filePath);
     try {
-      const fileData = fs.readFileSync(filePath).toString("base64");
-      this.webviews.post(panel.webview, {
-        command: "play",
-        fileName,
-        fileData,
-      });
+      this.webviews.post(panel.webview, build());
     } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to read ${fileName}: ${toErrorMessage(error)}`
+        `Failed to read ${path.basename(filePath)}: ${toErrorMessage(error)}`
       );
     }
   }
+}
+
+function readBase64(filePath: string): string | null {
+  return fs.existsSync(filePath)
+    ? fs.readFileSync(filePath).toString("base64")
+    : null;
 }
 
 export async function createResource(): Promise<void> {
