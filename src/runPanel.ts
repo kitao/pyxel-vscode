@@ -83,7 +83,9 @@ export class RunPanelController {
     if (running && !this.sendRunMessage(session)) return;
     this.session = session;
     panel.title = `Pyxel — ${scriptName}`;
-    panel.reveal(running ? undefined : vscode.ViewColumn.Beside, true);
+    // Creation already opens a persistent tab. Revealing it again immediately
+    // can race that first open and turn it into a replaceable preview tab.
+    if (running) panel.reveal(undefined, true);
   }
 
   private createPanel(): vscode.WebviewPanel {

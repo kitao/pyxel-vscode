@@ -96,7 +96,7 @@ describe("RunPanelController", () => {
     await harness.controller.run({ fsPath: scriptPath } as vscode.Uri);
 
     expect(harness.post).not.toHaveBeenCalled();
-    expect(harness.panel.reveal).toHaveBeenCalledWith(2, true);
+    expect(harness.panel.reveal).not.toHaveBeenCalled();
     harness.ready();
     expect(harness.resetErrorState).toHaveBeenCalledOnce();
     expect(harness.appendLine).toHaveBeenCalledWith("--- Run game.py ---");
