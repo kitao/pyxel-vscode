@@ -27,16 +27,6 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run package
-      - name: Publish to the Visual Studio Marketplace
-        if: env.VSCE_PAT != ''
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish --packagePath ./*.vsix --pat "$VSCE_PAT" --skip-duplicate
-      - name: Publish to Open VSX
-        if: env.OVSX_PAT != ''
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx --yes ovsx@1.2.0 publish ./*.vsix --pat "$OVSX_PAT" --skip-duplicate
       - run: gh release create "$GITHUB_REF_NAME" ./*.vsix --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
         env:
           GH_TOKEN: ${{ github.token }}
