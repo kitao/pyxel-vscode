@@ -1,3 +1,18 @@
+## 1.0.1
+
+- Remove the MCP server, the bundled skill, and pyxel.mcp.enabled
+- Remove the Get Started walkthrough
+- Support VS Code 1.85 and newer again
+- Stop publishing to the Marketplace and Open VSX from CI
+- Run the correct game and project files when switching scripts quickly
+- Reload only after all project files have been saved successfully
+- Preserve existing resource files when saving fails
+- Open resource files with uppercase extensions in the Pyxel Editor
+- Show errors from each game or resource panel independently
+- Send keyboard shortcuts only to the active Pyxel panel
+- Keep the game panel open when opening code after running from the explorer
+- Show a clear error when the selected script cannot be loaded
+
 ## 1.0.0
 
 - Offer pyxel-mcp 1.3.0 to VS Code agent mode through uvx when uv is installed
