@@ -56,6 +56,8 @@ function request(
     let clientRequest: ReturnType<typeof https.get>;
     try {
       clientRequest = https.get(url, options, (response) => {
+        // Even a discarded error/redirect body can fail while being drained.
+        response.on("error", reject);
         if (isRedirectStatus(response.statusCode)) {
           response.resume();
           if (remainingRedirects === 0) {
@@ -90,7 +92,6 @@ function request(
         const chunks: Buffer[] = [];
         response.on("data", (chunk: Buffer) => chunks.push(chunk));
         response.on("end", () => resolve(Buffer.concat(chunks)));
-        response.on("error", reject);
       });
     } catch (error: unknown) {
       reject(error instanceof Error ? error : new Error(String(error)));

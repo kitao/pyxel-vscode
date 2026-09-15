@@ -23,14 +23,14 @@ function mockResponse(
   statusCode: number,
   body: string,
   headers: IncomingMessage["headers"] = {}
-): void {
+): IncomingMessage {
+  const stream = new PassThrough();
+  const response = stream as unknown as IncomingMessage;
   const fakeGet = (
     _url: string | URL,
     _options: https.RequestOptions,
     callback: (response: IncomingMessage) => void
   ) => {
-    const stream = new PassThrough();
-    const response = stream as unknown as IncomingMessage;
     response.statusCode = statusCode;
     response.headers = headers;
     const request = new EventEmitter() as unknown as ClientRequest;
@@ -43,6 +43,7 @@ function mockResponse(
     return request;
   };
   vi.mocked(https.get).mockImplementationOnce(fakeGet as typeof https.get);
+  return response;
 }
 
 describe("httpsGet", () => {
@@ -97,6 +98,14 @@ describe("httpsGet", () => {
     await expect(httpsGet("https://example.com/file")).rejects.toEqual(
       new Error("HTTP 304 for https://example.com/file")
     );
+  });
+
+  it("handles an error while draining an unsuccessful response", async () => {
+    const response = mockResponse(503, "unavailable");
+    await expect(httpsGet("https://example.com/file")).rejects.toThrow("HTTP 503");
+
+    expect(() => response.emit("error", new Error("connection reset")))
+      .not.toThrow();
   });
 
   it("rejects synchronous request errors", async () => {
