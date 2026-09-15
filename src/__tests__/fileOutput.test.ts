@@ -23,7 +23,11 @@ vi.mock("vscode", () => ({
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
-  return { ...actual, writeFileSync: vi.fn(actual.writeFileSync) };
+  return {
+    ...actual,
+    writeFileSync: vi.fn(actual.writeFileSync),
+    renameSync: vi.fn(actual.renameSync),
+  };
 });
 
 import { saveCapture, writeResource } from "../fileOutput";
@@ -44,6 +48,7 @@ afterEach(async () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
   const actual = await vi.importActual<typeof import("fs")>("fs");
   vi.mocked(fs.writeFileSync).mockImplementation(actual.writeFileSync);
+  vi.mocked(fs.renameSync).mockReset().mockImplementation(actual.renameSync);
 });
 
 describe("file output", () => {
@@ -65,6 +70,58 @@ describe("file output", () => {
     expect(vscodeState.showErrorMessage).toHaveBeenCalledWith(
       "Failed to save game.pyxres: disk full"
     );
+  });
+
+  it("preserves the original resource if a write fails after truncation", async () => {
+    const actualFs = await vi.importActual<typeof import("fs")>("fs");
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    vi.mocked(fs.writeFileSync).mockImplementationOnce((destination) => {
+      actualFs.writeFileSync(destination, "partial");
+      throw new Error("disk full");
+    });
+
+    expect(writeResource(filePath, Buffer.from("replacement").toString("base64")))
+      .toBe(false);
+    expect(fs.readFileSync(filePath, "utf8")).toBe("original");
+    expect(fs.readdirSync(tmpDir)).toEqual(["game.pyxres"]);
+  });
+
+  it("preserves the original resource when replacement fails", () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    vi.mocked(fs.renameSync).mockImplementationOnce(() => {
+      throw new Error("file locked");
+    });
+
+    expect(writeResource(filePath, Buffer.from("replacement").toString("base64")))
+      .toBe(false);
+    expect(fs.readFileSync(filePath, "utf8")).toBe("original");
+    expect(fs.readdirSync(tmpDir)).toEqual(["game.pyxres"]);
+    expect(vscodeState.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to save game.pyxres: file locked"
+    );
+  });
+
+  it("preserves an explicitly opened symlink when saving its target", () => {
+    const target = path.join(tmpDir, "target.pyxres");
+    const link = path.join(tmpDir, "linked.pyxres");
+    fs.writeFileSync(target, "original");
+    fs.symlinkSync(target, link);
+
+    expect(writeResource(link, Buffer.from("replacement").toString("base64")))
+      .toBe(true);
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(target, "utf8")).toBe("replacement");
+  });
+
+  it.skipIf(process.platform === "win32")("preserves resource permissions", () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    fs.chmodSync(filePath, 0o660);
+
+    expect(writeResource(filePath, "AA==")).toBe(true);
+    expect(fs.statSync(filePath).mode & 0o777).toBe(0o660);
   });
 
   it("writes a capture and opens the saved URI on request", async () => {
