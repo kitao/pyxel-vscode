@@ -2,12 +2,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { saveCapture } from "./fileOutput";
 import { PyxelWebviewManager } from "./pyxelWebview";
-import {
-  collectFiles,
-  isPyxelRunnable,
-  isWatchedFile,
-  toErrorMessage,
-} from "./utils";
+import { collectFiles, isWatchedFile } from "./projectFiles";
+import { isPyxelRunnable, toErrorMessage } from "./utils";
 
 const RELOAD_DEBOUNCE_MS = 200;
 

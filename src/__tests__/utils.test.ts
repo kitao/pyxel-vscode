@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
-import * as path from "path";
 import {
   PYXEL_VERSION,
   isPyxelRunnable,
   getNonce,
   isSafeFileName,
-  isWatchedFile,
 } from "../utils";
 
 describe("PYXEL_VERSION", () => {
@@ -72,46 +70,3 @@ describe("isSafeFileName", () => {
     expect(isSafeFileName("..\\escape.png")).toBe(false);
   });
 });
-
-describe("isWatchedFile", () => {
-  const root = path.join(path.sep, "proj");
-
-  it("accepts files under the root", () => {
-    expect(isWatchedFile(path.join(root, "main.py"), root)).toBe(true);
-    expect(isWatchedFile(path.join(root, "sub", "a.pyxres"), root)).toBe(true);
-  });
-
-  it("rejects files outside the root", () => {
-    expect(isWatchedFile(
-      path.join(path.sep, "other", "main.py"),
-      root
-    )).toBe(false);
-    expect(isWatchedFile(path.join(root, "..", "main.py"), root)).toBe(false);
-  });
-
-  it("rejects dotfiles and skip directories", () => {
-    expect(isWatchedFile(path.join(root, ".env"), root)).toBe(false);
-    expect(isWatchedFile(
-      path.join(root, ".venv", "lib", "x.py"),
-      root
-    )).toBe(false);
-    expect(isWatchedFile(
-      path.join(root, "node_modules", "p", "i.js"),
-      root
-    )).toBe(false);
-    expect(isWatchedFile(
-      path.join(root, "__pycache__", "m.pyc"),
-      root
-    )).toBe(false);
-  });
-
-  it("rejects files deeper than the collection limit", () => {
-    expect(isWatchedFile(path.join(root, "a", "b", "c", "ok.py"), root))
-      .toBe(true);
-    expect(isWatchedFile(
-      path.join(root, "a", "b", "c", "d", "deep.py"),
-      root
-    )).toBe(false);
-  });
-});
-

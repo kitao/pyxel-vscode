@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { collectFiles } from "../utils";
+import { collectFiles, isWatchedFile } from "../projectFiles";
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
@@ -221,3 +221,46 @@ describe("collectFiles", () => {
     expect(skipped).toEqual([]);
   });
 });
+
+describe("isWatchedFile", () => {
+  const root = path.join(path.sep, "proj");
+
+  it("accepts files under the root", () => {
+    expect(isWatchedFile(path.join(root, "main.py"), root)).toBe(true);
+    expect(isWatchedFile(path.join(root, "sub", "a.pyxres"), root)).toBe(true);
+  });
+
+  it("rejects files outside the root", () => {
+    expect(isWatchedFile(
+      path.join(path.sep, "other", "main.py"),
+      root
+    )).toBe(false);
+    expect(isWatchedFile(path.join(root, "..", "main.py"), root)).toBe(false);
+  });
+
+  it("rejects dotfiles and skip directories", () => {
+    expect(isWatchedFile(path.join(root, ".env"), root)).toBe(false);
+    expect(isWatchedFile(
+      path.join(root, ".venv", "lib", "x.py"),
+      root
+    )).toBe(false);
+    expect(isWatchedFile(
+      path.join(root, "node_modules", "p", "i.js"),
+      root
+    )).toBe(false);
+    expect(isWatchedFile(
+      path.join(root, "__pycache__", "m.pyc"),
+      root
+    )).toBe(false);
+  });
+
+  it("rejects files deeper than the collection limit", () => {
+    expect(isWatchedFile(path.join(root, "a", "b", "c", "ok.py"), root))
+      .toBe(true);
+    expect(isWatchedFile(
+      path.join(root, "a", "b", "c", "d", "deep.py"),
+      root
+    )).toBe(false);
+  });
+});
+
