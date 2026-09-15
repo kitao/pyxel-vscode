@@ -50,7 +50,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("routes validated Webview messages to their host handlers", () => {
-    const manager = new PyxelWebviewManager(outputChannel);
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
     const harness = createPanel();
     const onReady = vi.fn();
     const onSaved = vi.fn();
@@ -70,7 +70,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("rejects malformed and unsafe save messages", () => {
-    const manager = new PyxelWebviewManager(outputChannel);
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
     const harness = createPanel();
     const onSaved = vi.fn();
     manager.initialize(harness.panel, vi.fn(), onSaved);
@@ -92,7 +92,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("shows output once until the error state is reset", () => {
-    const manager = new PyxelWebviewManager(outputChannel);
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
     const harness = createPanel();
     manager.initialize(harness.panel, vi.fn());
 
@@ -107,7 +107,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("forwards shortcuts only to the active tracked Webview", () => {
-    const manager = new PyxelWebviewManager(outputChannel);
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
     const harness = createPanel(true);
     manager.initialize(harness.panel, vi.fn());
 

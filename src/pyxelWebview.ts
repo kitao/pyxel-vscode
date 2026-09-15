@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { type HostToWebviewMessage, parseWebviewMessage } from "./messages";
-import { isSafeFileName } from "./utils";
+import { isSafeFileName, toErrorMessage } from "./utils";
 import { getWebviewHtml } from "./webviewHtml";
 
 interface ForwardKeyArgs {
@@ -13,7 +13,10 @@ export class PyxelWebviewManager {
   private activeWebview: vscode.Webview | undefined;
   private errorPanelShown = false;
 
-  constructor(private readonly outputChannel: vscode.OutputChannel) {}
+  constructor(
+    private readonly outputChannel: vscode.OutputChannel,
+    private readonly loadScript: () => string
+  ) {}
 
   initialize(
     panel: vscode.WebviewPanel,
@@ -21,7 +24,14 @@ export class PyxelWebviewManager {
     onSaved?: (fileName: string, data: string) => void
   ): void {
     panel.webview.options = { enableScripts: true, localResourceRoots: [] };
-    panel.webview.html = getWebviewHtml();
+    try {
+      panel.webview.html = getWebviewHtml(this.loadScript());
+    } catch (error: unknown) {
+      this.reportError(
+        `Failed to load the Pyxel Webview script: ${toErrorMessage(error)}`
+      );
+      return;
+    }
     this.track(panel);
 
     panel.webview.onDidReceiveMessage((raw: unknown) => {

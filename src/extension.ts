@@ -5,12 +5,15 @@ import { createDocumentationCommand } from "./documentationPanels";
 import { PyxelWebviewManager } from "./pyxelWebview";
 import { RunPanelController } from "./runPanel";
 import { PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL } from "./utils";
+import { readWebviewScript } from "./webviewHtml";
 
 let runPanel: RunPanelController | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Pyxel");
-  const webviews = new PyxelWebviewManager(outputChannel);
+  const webviews = new PyxelWebviewManager(outputChannel, () =>
+    readWebviewScript(context.extensionPath)
+  );
   const controller = new RunPanelController(webviews, outputChannel);
   runPanel = controller;
   const fileProvider = new PyxelFileProvider(
