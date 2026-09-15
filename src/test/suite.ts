@@ -27,9 +27,12 @@ export async function run(): Promise<void> {
   await extension.activate();
   assert.ok(extension.isActive, "extension activates");
 
+  const manifest = extension.packageJSON as {
+    contributes: { commands: Array<{ command: string }> };
+  };
   const commands = new Set(await vscode.commands.getCommands(true));
-  for (const command of extension.packageJSON.contributes.commands) {
-    assert.ok(commands.has(command.command), `${command.command} is registered`);
+  for (const { command } of manifest.contributes.commands) {
+    assert.ok(commands.has(command), `${command} is registered`);
   }
 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-smoke-"));

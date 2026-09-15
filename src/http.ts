@@ -21,7 +21,9 @@ export function httpsGet(
   });
   if (token?.isCancellationRequested) controller?.abort();
   return request(url, maxRedirects, controller?.signal)
-    .finally(() => cancellation?.dispose());
+    .finally(() => {
+      cancellation?.dispose();
+    });
 }
 
 export function isRedirectStatus(statusCode: number | undefined): boolean {
@@ -86,12 +88,12 @@ function request(
         }
 
         const chunks: Buffer[] = [];
-        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
         response.on("end", () => resolve(Buffer.concat(chunks)));
         response.on("error", reject);
       });
     } catch (error: unknown) {
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
       return;
     }
     clientRequest.setTimeout(REQUEST_TIMEOUT_MS, () => {

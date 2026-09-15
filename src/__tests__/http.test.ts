@@ -139,12 +139,12 @@ describe("httpsGet", () => {
       emitter.setTimeout = vi.fn((ms: number, fire?: () => void) => {
         timeout = { fire: fire as () => void, ms };
         return emitter;
-      }) as ClientRequest["setTimeout"];
+      });
       // Node reports a destroy reason through the error event.
       emitter.destroy = vi.fn((error?: Error) => {
         emitter.emit("error", error);
         return emitter;
-      }) as ClientRequest["destroy"];
+      });
       request = emitter;
       return emitter;
     };

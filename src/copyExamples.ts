@@ -40,7 +40,7 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
       let tmpDir: string | undefined;
       try {
         tmpDir = fs.mkdtempSync(path.join(targetDir, ".pyxel_examples-"));
-        const treeJson = JSON.parse(
+        const treeJson: unknown = JSON.parse(
           (await httpsGet(getExamplesTreeUrl(), 5, token)).toString()
         );
         const files = selectExampleFiles(treeJson);

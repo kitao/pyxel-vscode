@@ -33,7 +33,7 @@ let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-output-test-"));
   vi.mocked(fs.writeFileSync).mockClear();
-  vscodeState.asRelativePath.mockImplementation((filePath) => filePath);
+  vscodeState.asRelativePath.mockImplementation((filePath: string) => filePath);
   vscodeState.executeCommand.mockReset().mockResolvedValue(undefined);
   vscodeState.showErrorMessage.mockReset();
   vscodeState.showInformationMessage.mockReset().mockResolvedValue(undefined);
