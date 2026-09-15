@@ -12,6 +12,11 @@ npm run compile
 Press `F5` in VS Code to launch an Extension Development Host with the
 extension loaded.
 
+The extension host and the Webview are compiled separately, since only the
+Webview sees the DOM: `npm run compile` runs `tsc` for `src` and then for
+`src/webview`, whose output is inlined into the Webview page at runtime. A
+Webview change needs a recompile before it shows up.
+
 ## Checks
 
 ```bash
