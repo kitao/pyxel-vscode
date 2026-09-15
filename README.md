@@ -53,6 +53,12 @@ files.
   use the `.vsix` attached to each
   [GitHub release](https://github.com/kitao/pyxel-vscode/releases).
 
+## Reporting problems
+
+Errors from the extension and the Pyxel runtime are written to **View › Output
+› Pyxel**. Include those lines when you
+[open an issue](https://github.com/kitao/pyxel-vscode/issues).
+
 ## Related projects
 
 - [Pyxel](https://github.com/kitao/pyxel) — the retro game engine for Python.

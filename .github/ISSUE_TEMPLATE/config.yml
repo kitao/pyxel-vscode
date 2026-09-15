@@ -1,5 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Pyxel engine questions
-    url: https://github.com/kitao/pyxel/discussions
-    about: Questions about Pyxel itself rather than the VS Code extension.

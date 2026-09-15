@@ -6,7 +6,6 @@
 .vscode-test/**
 .vscode/**
 CONTRIBUTING.md
-SECURITY.md
 dist/test/**
 eslint.config.mjs
 node_modules/**
