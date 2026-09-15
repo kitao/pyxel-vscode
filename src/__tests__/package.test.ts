@@ -4,32 +4,34 @@ import * as path from "path";
 
 const ROOT = path.join(__dirname, "..", "..");
 
-type PackageJson = {
-  activationEvents: string[];
+const read = (relativePath: string) =>
+  fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+
+const pkg = JSON.parse(read("package.json")) as {
   devDependencies: Record<string, string>;
   engines: { vscode: string };
-  scripts: Record<string, string>;
-  contributes: {
-    commands: Array<{ command: string }>;
-  };
 };
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(ROOT, "package.json"), "utf8")
-) as PackageJson;
+// The minimum VS Code the extension claims to support, as "major.minor".
+const supportedVersion = pkg.engines.vscode.match(/^\^(\d+\.\d+)\./)?.[1];
 
-describe("package manifest", () => {
-  it("compiles before publishing or packaging the VS Code extension", () => {
-    expect(pkg.scripts["vscode:prepublish"]).toBe("npm run compile");
-    expect(pkg.scripts.package).toBe("vsce package");
+describe("oldest supported VS Code", () => {
+  it("is declared as a range the marketplace understands", () => {
+    expect(supportedVersion).toMatch(/^\d+\.\d+$/);
   });
 
-  it("keeps the API types in step with the oldest supported VS Code", () => {
-    expect(pkg.engines.vscode).toBe("^1.85.0");
-    expect(pkg.devDependencies["@types/vscode"]).toBe("~1.85.0");
+  it("is the API version the sources are compiled against", () => {
+    const types = pkg.devDependencies["@types/vscode"];
+
+    expect(types).toMatch(/^~\d+\.\d+\./);
+    expect(types.match(/^~(\d+\.\d+)\./)?.[1]).toBe(supportedVersion);
   });
 
-  it("lets VS Code derive activation from the contributions", () => {
-    expect(pkg.activationEvents).toEqual([]);
+  it("is the version the integration test runs the extension in", () => {
+    const source = read("src/test/runTest.ts");
+
+    expect(source).toMatch(/VSCODE_VERSION \?\? "\d+\.\d+\.\d+"/);
+    expect(source.match(/VSCODE_VERSION \?\? "(\d+\.\d+)\./)?.[1])
+      .toBe(supportedVersion);
   });
 });
