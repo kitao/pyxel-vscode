@@ -123,6 +123,74 @@ describe("copyExamples helpers", () => {
       new Error("GitHub tree response contains no Pyxel examples")
     );
   });
+});
+
+// The progress task, the cancellation token, and the dialogs are the same
+// for every end-to-end copy, so each test only says what differs.
+function createToken() {
+  const listeners = new Set<() => void>();
+  const token = {
+    isCancellationRequested: false,
+    onCancellationRequested: vi.fn((listener: () => void) => {
+      listeners.add(listener);
+      return { dispose: () => listeners.delete(listener) };
+    }),
+  };
+  return {
+    cancel: () => {
+      token.isCancellationRequested = true;
+      for (const listener of listeners) listener();
+    },
+    listeners,
+    token,
+  };
+}
+
+function createVsCodeApi(token: ReturnType<typeof createToken>["token"]) {
+  const showErrorMessage = vi.fn();
+  const showInformationMessage = vi.fn();
+  const showWarningMessage = vi.fn().mockResolvedValue("Replace");
+  const api = {
+    ProgressLocation: { Notification: 15 },
+    window: {
+      showErrorMessage,
+      showInformationMessage,
+      showOpenDialog: vi.fn().mockResolvedValue([{ fsPath: tmpDir }]),
+      showWarningMessage,
+      withProgress: vi.fn(async (
+        _options: unknown,
+        task: (progress: unknown, cancellationToken: typeof token) => Promise<void>
+      ) => task({}, token)),
+    },
+  } as unknown as Parameters<typeof copyExamples>[0];
+  return { api, showErrorMessage, showInformationMessage, showWarningMessage };
+}
+
+describe("copyExamples", () => {
+  it("creates the folders the examples live in", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-copy-test-"));
+    mockJsonResponse(JSON.stringify({
+      tree: [
+        { type: "blob", path: `${EXAMPLES_PREFIX}01_hello.py` },
+        { type: "blob", path: `${EXAMPLES_PREFIX}assets/sample.pyxres` },
+      ],
+    }));
+    mockResponse(200, "script");
+    mockResponse(200, "resource");
+    const { api, showErrorMessage, showInformationMessage } =
+      createVsCodeApi(createToken().token);
+
+    await copyExamples(api);
+
+    const examplesDir = path.join(tmpDir, "pyxel_examples");
+    expect(fs.readFileSync(path.join(examplesDir, "01_hello.py"), "utf8"))
+      .toBe("script");
+    expect(
+      fs.readFileSync(path.join(examplesDir, "assets", "sample.pyxres"), "utf8")
+    ).toBe("resource");
+    expect(showInformationMessage).toHaveBeenCalledWith("Copied 2 example files.");
+    expect(showErrorMessage).not.toHaveBeenCalled();
+  });
 
   it("preserves existing examples when replacement fails", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-copy-test-"));
@@ -143,27 +211,9 @@ describe("copyExamples helpers", () => {
       }
       return actualFs.renameSync(source, destination);
     });
+    const { api, showErrorMessage } = createVsCodeApi(createToken().token);
 
-    const showErrorMessage = vi.fn();
-    const token = {
-      isCancellationRequested: false,
-      onCancellationRequested: vi.fn(() => ({ dispose: vi.fn() })),
-    };
-    const vscodeApi = {
-      ProgressLocation: { Notification: 15 },
-      window: {
-        showOpenDialog: vi.fn().mockResolvedValue([{ fsPath: tmpDir }]),
-        showWarningMessage: vi.fn().mockResolvedValue("Replace"),
-        showInformationMessage: vi.fn(),
-        showErrorMessage,
-        withProgress: vi.fn(async (
-          _options: unknown,
-          task: (progress: unknown, cancellationToken: typeof token) => Promise<void>
-        ) => task({}, token)),
-      },
-    } as unknown as Parameters<typeof copyExamples>[0];
-
-    await copyExamples(vscodeApi);
+    await copyExamples(api);
 
     expect(fs.existsSync(oldFile)).toBe(true);
     expect(fs.readdirSync(tmpDir)).toEqual(["pyxel_examples"]);
@@ -203,34 +253,13 @@ describe("copyExamples helpers", () => {
     };
     vi.mocked(https.get).mockImplementationOnce(pendingGet as typeof https.get);
 
-    const cancellationListeners = new Set<() => void>();
-    const token = {
-      isCancellationRequested: false,
-      onCancellationRequested: vi.fn((listener: () => void) => {
-        cancellationListeners.add(listener);
-        return { dispose: () => cancellationListeners.delete(listener) };
-      }),
-    };
-    const showErrorMessage = vi.fn();
-    const showInformationMessage = vi.fn();
-    const vscodeApi = {
-      ProgressLocation: { Notification: 15 },
-      window: {
-        showOpenDialog: vi.fn().mockResolvedValue([{ fsPath: tmpDir }]),
-        showWarningMessage: vi.fn(),
-        showInformationMessage,
-        showErrorMessage,
-        withProgress: vi.fn(async (
-          _options: unknown,
-          task: (progress: unknown, cancellationToken: typeof token) => Promise<void>
-        ) => task({}, token)),
-      },
-    } as unknown as Parameters<typeof copyExamples>[0];
+    const cancellation = createToken();
+    const { api, showErrorMessage, showInformationMessage } =
+      createVsCodeApi(cancellation.token);
 
-    const copyPromise = copyExamples(vscodeApi);
+    const copyPromise = copyExamples(api);
     await started;
-    token.isCancellationRequested = true;
-    for (const listener of cancellationListeners) listener();
+    cancellation.cancel();
     downloadStream?.end("new");
     await copyPromise;
 
@@ -238,6 +267,6 @@ describe("copyExamples helpers", () => {
     expect(showInformationMessage).not.toHaveBeenCalled();
     expect(showErrorMessage).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(tmpDir, "pyxel_examples"))).toBe(false);
-    expect(cancellationListeners.size).toBe(0);
+    expect(cancellation.listeners.size).toBe(0);
   });
 });

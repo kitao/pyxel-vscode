@@ -127,4 +127,71 @@ describe("httpsGet", () => {
       "../other.py"
     )).toBe("https://example.com/other.py");
   });
+  it("gives up on a request that never responds", async () => {
+    let timeout: { ms: number; fire: () => void } | undefined;
+    let request: ClientRequest | undefined;
+    const stalledGet = (
+      _url: string | URL,
+      _options: https.RequestOptions,
+      _callback: (response: IncomingMessage) => void
+    ) => {
+      const emitter = new EventEmitter() as unknown as ClientRequest;
+      emitter.setTimeout = vi.fn((ms: number, fire?: () => void) => {
+        timeout = { fire: fire as () => void, ms };
+        return emitter;
+      }) as ClientRequest["setTimeout"];
+      // Node reports a destroy reason through the error event.
+      emitter.destroy = vi.fn((error?: Error) => {
+        emitter.emit("error", error);
+        return emitter;
+      }) as ClientRequest["destroy"];
+      request = emitter;
+      return emitter;
+    };
+    vi.mocked(https.get).mockImplementationOnce(stalledGet as typeof https.get);
+
+    const pending = httpsGet("https://example.com/slow");
+    timeout?.fire();
+
+    await expect(pending).rejects.toThrow(
+      "Request timed out for https://example.com/slow"
+    );
+    expect(timeout?.ms).toBe(30 * 1000);
+    expect(request?.destroy).toHaveBeenCalledOnce();
+  });
+
+  it("aborts a request that is already in flight and stops listening", async () => {
+    const listeners = new Set<() => void>();
+    const token = {
+      isCancellationRequested: false,
+      onCancellationRequested: (listener: () => void) => {
+        listeners.add(listener);
+        return { dispose: () => listeners.delete(listener) };
+      },
+    } as unknown as Parameters<typeof httpsGet>[2];
+
+    let signal: AbortSignal | undefined;
+    let request: ClientRequest | undefined;
+    const pendingGet = (
+      _url: string | URL,
+      options: https.RequestOptions,
+      _callback: (response: IncomingMessage) => void
+    ) => {
+      signal = options.signal;
+      const emitter = new EventEmitter() as unknown as ClientRequest;
+      emitter.setTimeout = vi.fn().mockReturnValue(emitter);
+      emitter.destroy = vi.fn().mockReturnValue(emitter);
+      request = emitter;
+      return emitter;
+    };
+    vi.mocked(https.get).mockImplementationOnce(pendingGet as typeof https.get);
+
+    const pending = httpsGet("https://example.com/big", 5, token);
+    for (const listener of listeners) listener();
+
+    expect(signal?.aborted).toBe(true);
+    request?.emit("error", new Error("aborted"));
+    await expect(pending).rejects.toThrow("aborted");
+    expect(listeners.size).toBe(0);
+  });
 });
