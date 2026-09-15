@@ -30,9 +30,13 @@ All four must pass before committing, and CI runs the same ones. Add or
 update tests in `src/__tests__` for the modules you change.
 
 CI also runs `npm run test:integration`, which downloads VS Code into
-`.vscode-test/` and checks that the extension activates and registers its
-commands in a real editor. Run it yourself when you change activation,
-`contributes`, or `src/test`.
+`.vscode-test/` and checks activation, command registration, run-panel reuse,
+and opening a new resource in the real editor. Run it yourself when you
+change activation, panels, custom editors, `contributes`, or `src/test`.
+
+The integration smoke test does not wait for the CDN runtime. For Webview
+changes, also launch a game with the pinned runtime, run another script while
+it loads, and open and save a resource in Pyxel Editor.
 
 ## Pinned upstream version
 

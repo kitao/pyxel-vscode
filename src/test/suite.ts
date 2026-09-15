@@ -15,8 +15,8 @@ async function eventually(check: () => boolean, timeoutMs = 5000): Promise<boole
   return check();
 }
 
-function tabLabels(): string[] {
-  return vscode.window.tabGroups.all.flatMap((group) => group.tabs.map((tab) => tab.label));
+function tabs(): vscode.Tab[] {
+  return vscode.window.tabGroups.all.flatMap((group) => group.tabs);
 }
 
 // Smoke test against a real VS Code: everything that only the extension host
@@ -36,11 +36,35 @@ export async function run(): Promise<void> {
   }
 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-smoke-"));
-  const script = path.join(directory, "game.py");
-  fs.writeFileSync(script, "import pyxel\n");
-  await vscode.commands.executeCommand("pyxel.run", vscode.Uri.file(script));
-  const opened = await eventually(() =>
-    tabLabels().some((label) => label.startsWith("Pyxel"))
-  );
-  assert.ok(opened, `run panel opened (tabs: ${tabLabels().join(", ")})`);
+  const existingTabs = new Set(tabs());
+  try {
+    const script = path.join(directory, "game.py");
+    fs.writeFileSync(script, "import pyxel\n");
+    await vscode.commands.executeCommand("pyxel.run", vscode.Uri.file(script));
+    const opened = await eventually(() => tabs().some((tab) =>
+      !existingTabs.has(tab) && tab.input instanceof vscode.TabInputWebview
+    ));
+    assert.ok(opened, "run panel opened");
+    const runTab = tabs().find((tab) => !existingTabs.has(tab));
+
+    const second = path.join(directory, "second.py");
+    fs.writeFileSync(second, "import pyxel\n");
+    await vscode.commands.executeCommand("pyxel.run", vscode.Uri.file(second));
+    assert.ok(await eventually(() => runTab?.label === "Pyxel — second.py"),
+      "the existing run panel switches to the next script");
+    assert.equal(tabs().filter((tab) => !existingTabs.has(tab)).length, 1,
+      "running again does not open another panel");
+
+    // New Resource opens a path before it exists on disk.
+    const resource = vscode.Uri.file(path.join(directory, "new.PYXRES"));
+    await vscode.commands.executeCommand("vscode.openWith", resource, "pyxel.editor");
+    assert.ok(await eventually(() => tabs().some((tab) =>
+      tab.input instanceof vscode.TabInputCustom &&
+      tab.input.viewType === "pyxel.editor" &&
+      tab.input.uri.toString() === resource.toString()
+    )), "a new resource opens in the custom editor");
+  } finally {
+    await vscode.window.tabGroups.close(tabs().filter((tab) => !existingTabs.has(tab)));
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 }
