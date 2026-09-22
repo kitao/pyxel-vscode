@@ -20,15 +20,6 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
   const targetDir = folders[0].fsPath;
   const examplesDir = path.join(targetDir, "pyxel_examples");
 
-  if (fs.existsSync(examplesDir)) {
-    const choice = await vscodeApi.window.showWarningMessage(
-      "The folder pyxel_examples already exists here. Replace it?",
-      { modal: true },
-      "Replace"
-    );
-    if (choice !== "Replace") return;
-  }
-
   await vscodeApi.window.withProgress(
     {
       location: vscodeApi.ProgressLocation.Notification,
@@ -46,6 +37,15 @@ export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
         const files = selectExampleFiles(treeJson);
         await downloadAll(files, tmpDir, token);
         if (token.isCancellationRequested) return;
+        // Confirm the current destination only after the download is ready.
+        if (fs.existsSync(examplesDir)) {
+          const choice = await vscodeApi.window.showWarningMessage(
+            "The folder pyxel_examples already exists here. Replace it?",
+            { modal: true },
+            "Replace"
+          );
+          if (choice !== "Replace" || token.isCancellationRequested) return;
+        }
         replaceExamplesDirectory(tmpDir, examplesDir);
         vscodeApi.window.showInformationMessage(
           `Copied ${files.length} example files.`
@@ -86,6 +86,8 @@ export function selectExampleFiles(treeJson: unknown): string[] {
     };
     if (type !== "blob" || typeof entryPath !== "string") return [];
     if (!entryPath.startsWith(EXAMPLES_PREFIX)) return [];
+    // pyxel.flip() deliberately aborts the Web runtime.
+    if (entryPath === `${EXAMPLES_PREFIX}99_flip_animation.py`) return [];
     if (entryPath.includes("__pycache__")) return [];
     if (entryPath.includes("\\")) return [];
     if (entryPath.split("/").some((part) => part === ".." || part === "")) {

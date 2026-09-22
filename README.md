@@ -21,10 +21,12 @@ files.
   `Pyxel: New Resource` creates one.
 - **Play apps** — `.pyxapp` files open in the Pyxel Player.
 - **Copy examples** — `Pyxel: Copy Examples` downloads the official examples
-  for the bundled Pyxel version into a `pyxel_examples` folder.
+  for the bundled Pyxel version into a `pyxel_examples` folder, excluding the
+  native-only `99_flip_animation.py` example.
 - **Browse docs** — `Pyxel: API Reference` and `Pyxel: Editor Manual`.
 - **Capture** — screenshots and screencasts taken in the game are saved next
-  to the file you opened.
+  to the file you opened. Existing captures are kept; repeated names receive a
+  numbered suffix.
 
 ## Getting started
 
@@ -43,20 +45,24 @@ files.
 
 - VS Code 1.85 or newer.
 - The Pyxel Web runtime (Pyxel 2.9.9) is loaded from jsDelivr, so an internet
-  connection is required to launch games.
+  connection is required to launch games. If loading fails or stalls, use
+  **Retry** in the panel after checking your connection.
 - Project files are bundled into the runtime with these limits: 5 MB per file,
   20 MB in total, 3 directory levels deep. Skipped files are listed in the
   Pyxel output channel.
 - The extension is disabled in Restricted Mode because running a script
   executes workspace code.
+- Save resource edits with the Pyxel Editor's save button or Ctrl+S / Cmd+S
+  before closing the tab. Resource edits do not participate in VS Code's
+  unsaved indicators, Save All, or recovery backups.
 - The extension is not yet on Open VSX. Editors that install from there can
   use the `.vsix` attached to each
   [GitHub release](https://github.com/kitao/pyxel-vscode/releases).
 
 ## Reporting problems
 
-Errors from the extension and the Pyxel runtime are written to **View › Output
-› Pyxel**. Include those lines when you
+Runtime errors and Python output are written to **View › Output › Pyxel**.
+For copy or save failures, also include the error notification when you
 [open an issue](https://github.com/kitao/pyxel-vscode/issues).
 
 ## Development

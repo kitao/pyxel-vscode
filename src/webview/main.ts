@@ -3,7 +3,7 @@
 // module. webview.test.ts asserts that the protocol below still matches the
 // host side in src/messages.ts.
 export type HostMessage =
-  | { command: "run"; scriptName: string; files: Record<string, string> }
+  | { command: "run"; sessionId: number; scriptName: string; files: Record<string, string> }
   | {
     command: "edit";
     fileName: string;
@@ -17,7 +17,8 @@ export type WebviewMessage =
   | { command: "ready" }
   | { command: "title"; title: string }
   | { command: "error"; message: string }
-  | { command: "saved"; fileName: string; data: string };
+  | { command: "log"; message: string }
+  | { command: "saved"; fileName: string; data: string; sessionId?: number };
 
 // Provided by VS Code and by the Pyxel Web runtime loaded from the CDN.
 declare function acquireVsCodeApi(): {
@@ -74,7 +75,7 @@ import pyxel.cli
 
 name = js.window._pendingFileName
 file_data = js.window._pendingFileData
-if file_data:
+if isinstance(file_data, str):
     data = base64.b64decode(file_data)
     with open(name, 'wb') as f:
         f.write(data)
@@ -86,6 +87,7 @@ if pal_data:
         pal_name = name + '.pyxpal'
     with open(pal_name, 'wb') as f:
         f.write(base64.b64decode(pal_data))
+
 pyxel.cli.edit_pyxel_resource(name)
 `;
 
@@ -103,7 +105,9 @@ pyxel.cli.play_pyxel_app(name)
 
 export const RUNTIME_LOAD_ERROR =
   "Failed to load the Pyxel runtime from cdn.jsdelivr.net. " +
-  "Check your network connection, then close and reopen this panel.";
+  "Check your network connection, then retry loading this panel.";
+
+export const RUNTIME_START_TIMEOUT_MS = 60_000;
 
 export const KEY_RELEASE_DELAY_MS = 80;
 
@@ -159,8 +163,8 @@ export interface RunnerHost {
   installSaveBridge(): void;
   launch(script: string): Promise<void>;
   reset(script: string): Promise<void>;
-  reportError(message: string): void;
   reportFatal(message: string): void;
+  reload(): void;
 }
 
 // Pyxel starts once; every later script resets the running instance. A script
@@ -169,12 +173,18 @@ export interface RunnerHost {
 export class PyxelRunner {
   private started = false;
   private busy = false;
+  private needsReload = false;
   private queued: { script: string; prepare: () => void } | null = null;
 
   constructor(private readonly host: RunnerHost) {}
 
   async run(script: string, prepare: () => void = () => {}): Promise<void> {
+    if (this.needsReload) {
+      this.host.reload();
+      return;
+    }
     if (!this.host.isRuntimeLoaded()) {
+      this.needsReload = true;
       this.host.reportFatal(RUNTIME_LOAD_ERROR);
       return;
     }
@@ -185,27 +195,37 @@ export class PyxelRunner {
 
     this.busy = true;
     const operation = this.started ? "reset" : "launch";
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       // Publish the payload only when this request starts. A later message
       // must not change the globals while launch/reset is still using them.
       prepare();
-      if (this.started) {
-        await this.host.reset(script);
-      } else {
-        this.host.installSaveBridge();
-        await this.host.launch(script);
-        this.started = true;
-      }
+      this.host.installSaveBridge();
+      const failure = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(
+          "The Pyxel runtime did not finish loading. Check your network connection and retry."
+        )), RUNTIME_START_TIMEOUT_MS);
+      });
+      await Promise.race([
+        this.started ? this.host.reset(script) : this.host.launch(script),
+        failure,
+      ]);
+      this.started = true;
     } catch (error: unknown) {
-      this.host.reportError(`Failed to ${operation} Pyxel: ${toErrorMessage(error)}`);
+      // A rejected/timed-out launch may have allocated a partial runtime, or
+      // may still complete later. Only a fresh page can safely retry it.
+      this.needsReload = true;
+      this.queued = null;
+      this.host.reportFatal(`Failed to ${operation} Pyxel: ${toErrorMessage(error)}`);
     } finally {
+      clearTimeout(timer);
       this.busy = false;
     }
 
     // A failed launch leaves nothing to reset, so drop what was queued.
     const next = this.queued;
     this.queued = null;
-    if (this.started && next !== null) await this.run(next.script, next.prepare);
+    if (!this.needsReload && this.started && next !== null) await this.run(next.script, next.prepare);
   }
 }
 
@@ -219,6 +239,14 @@ export function start(): void {
     if (element) {
       element.textContent = message;
       element.style.display = "block";
+      element.style.position = "absolute";
+      element.style.zIndex = "10000";
+      element.style.background = "#222";
+      const retry = document.createElement("button");
+      retry.textContent = "Retry";
+      retry.style.marginLeft = "12px";
+      retry.addEventListener("click", () => window.location.reload());
+      element.appendChild(retry);
     }
     reportError(message);
   };
@@ -229,22 +257,32 @@ export function start(): void {
     originalConsoleError.apply(console, args);
     reportError(args.join(" "));
   };
+  const originalConsoleLog = console.log;
+  console.log = (...args: unknown[]) => {
+    originalConsoleLog.apply(console, args);
+    post({ command: "log", message: args.join(" ") });
+  };
+
+  let saveSessionId: number | undefined;
 
   // Pyxel saves through window._savePyxelFile; a getter keeps the runtime
   // from replacing the bridge with its own browser download.
   const installSaveBridge = () => {
+    const sessionId = saveSessionId;
     const saveBridge = (filename: string) => {
+      // Pyodide paths are POSIX even when VS Code is running on Windows.
+      const fileName = filename.split("/").pop() || filename;
       try {
         const files = window.pyxelContext?.pyodide?.FS;
         if (!files) {
-          reportError("Pyxel filesystem is not ready.");
-          return;
+          throw new Error("Pyxel filesystem is not ready.");
         }
-        const fileName = filename.split(/[\\/]/).pop() || filename;
+        const data = encodeBase64(files.readFile(filename));
         post({
           command: "saved",
           fileName,
-          data: encodeBase64(files.readFile(filename)),
+          data,
+          ...(sessionId === undefined ? {} : { sessionId }),
         });
       } catch (error: unknown) {
         reportError(`Failed to save ${filename}: ${toErrorMessage(error)}`);
@@ -266,8 +304,8 @@ export function start(): void {
       if (context) context.params.script = script;
       await resetPyxel();
     },
-    reportError,
     reportFatal,
+    reload: () => window.location.reload(),
   });
 
   // Skip the runtime's click-to-play overlay.
@@ -291,12 +329,14 @@ export function start(): void {
     switch (message.command) {
       case "run":
         void runner.run(RUN_SCRIPT, () => {
+          saveSessionId = message.sessionId;
           window._pendingFiles = message.files;
           window._pendingScriptName = message.scriptName;
         });
         break;
       case "edit":
         void runner.run(EDIT_SCRIPT, () => {
+          saveSessionId = undefined;
           window._pendingFileName = message.fileName;
           window._pendingFileData = message.fileData;
           window._pendingPalData = message.palData;
@@ -304,6 +344,7 @@ export function start(): void {
         break;
       case "play":
         void runner.run(PLAY_SCRIPT, () => {
+          saveSessionId = undefined;
           window._pendingFileName = message.fileName;
           window._pendingFileData = message.fileData;
         });

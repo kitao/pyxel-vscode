@@ -28,34 +28,61 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
     const filePath = document.uri.fsPath;
     const isResource = path.extname(filePath).toLowerCase() === ".pyxres";
     const directory = path.dirname(filePath);
+    let baseline: string | null | undefined;
+
+    const saveResource = async (data: string): Promise<void> => {
+      if (baseline === undefined) {
+        vscode.window.showErrorMessage("The resource has not loaded. Reopen it before saving.");
+        return;
+      }
+      try {
+        const current = readBase64(filePath);
+        if (current !== baseline) {
+          const choice = await vscode.window.showWarningMessage(
+            `${path.basename(filePath)} changed on disk. Overwrite it with the editor contents?`,
+            { modal: true },
+            "Overwrite"
+          );
+          if (choice !== "Overwrite") return;
+          if (readBase64(filePath) !== current) {
+            vscode.window.showErrorMessage("The resource changed again while confirming. Save again to review the latest conflict.");
+            return;
+          }
+        }
+        if (writeResource(filePath, data)) {
+          baseline = data;
+          this.onResourceSaved(filePath);
+        }
+      } catch (error: unknown) {
+        vscode.window.showErrorMessage(
+          `Failed to save ${path.basename(filePath)}: ${toErrorMessage(error)}`
+        );
+      }
+    };
 
     this.webviews.initialize(
       panel,
       () => {
         if (isResource) {
-          this.sendEditMessage(panel, filePath);
+          this.send(panel, filePath, () => {
+            const fileData = readBase64(filePath);
+            const palData = readBase64(filePath.replace(/\.pyxres$/i, ".pyxpal"));
+            baseline = fileData;
+            return { command: "edit", fileName: path.basename(filePath), fileData, palData };
+          });
         } else {
           this.sendPlayMessage(panel, filePath);
         }
       },
       (fileName, data) => {
         if (isResource && fileName === path.basename(filePath)) {
-          if (writeResource(filePath, data)) this.onResourceSaved(filePath);
+          void saveResource(data);
           return;
         }
         saveCapture(directory, fileName, data);
-      }
+      },
+      isResource ? path.basename(filePath) : undefined
     );
-  }
-
-  private sendEditMessage(panel: vscode.WebviewPanel, filePath: string): void {
-    const palettePath = filePath.replace(/\.pyxres$/i, ".pyxpal");
-    this.send(panel, filePath, () => ({
-      command: "edit",
-      fileName: path.basename(filePath),
-      fileData: readBase64(filePath),
-      palData: readBase64(palettePath),
-    }));
   }
 
   private sendPlayMessage(panel: vscode.WebviewPanel, filePath: string): void {

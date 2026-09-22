@@ -11,10 +11,20 @@ interface PanelHarness {
 }
 
 function createPanel(active = false): PanelHarness {
+  let disposed = false;
   let disposeHandler = () => {};
   let stateHandler = () => {};
   let messageHandler = (_value: unknown) => {};
   const postMessage = vi.fn();
+  const webview = {
+    html: "",
+    onDidReceiveMessage: vi.fn((handler: (value: unknown) => void) => {
+      messageHandler = handler;
+      return { dispose: vi.fn() };
+    }),
+    options: {},
+    postMessage,
+  };
   const panel = {
     active,
     onDidChangeViewState: vi.fn((handler: () => void) => { stateHandler = handler; }),
@@ -23,18 +33,13 @@ function createPanel(active = false): PanelHarness {
       return { dispose: vi.fn() };
     }),
     title: "Pyxel",
-    webview: {
-      html: "",
-      onDidReceiveMessage: vi.fn((handler: (value: unknown) => void) => {
-        messageHandler = handler;
-        return { dispose: vi.fn() };
-      }),
-      options: {},
-      postMessage,
+    get webview() {
+      if (disposed) throw new Error("Webview is disposed");
+      return webview;
     },
   } as unknown as vscode.WebviewPanel;
   return {
-    dispose: () => disposeHandler(),
+    dispose: () => { disposed = true; disposeHandler(); },
     setActive: (active) => {
       Object.assign(panel, { active });
       stateHandler();
@@ -72,7 +77,27 @@ describe("PyxelWebviewManager", () => {
 
     expect(onReady).toHaveBeenCalledOnce();
     expect(harness.panel.title).toBe("My Game");
-    expect(onSaved).toHaveBeenCalledWith("capture.png", "AA==");
+    expect(onSaved).toHaveBeenCalledWith("capture.png", "AA==", undefined);
+  });
+
+  it("accepts the exact opened resource name, including a POSIX backslash", () => {
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const harness = createPanel();
+    const onSaved = vi.fn();
+    manager.initialize(harness.panel, vi.fn(), onSaved, "my\\resource.pyxres");
+    harness.message({ command: "saved", fileName: "my\\resource.pyxres", data: "AA==" });
+    harness.message({ command: "saved", fileName: "other\\file.pyxres", data: "AA==" });
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(onSaved).toHaveBeenCalledWith("my\\resource.pyxres", "AA==", undefined);
+  });
+
+  it("records stdout without repeatedly opening the Output panel", () => {
+    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const harness = createPanel();
+    manager.initialize(harness.panel, vi.fn());
+    harness.message({ command: "log", message: "Python diagnostic" });
+    expect(appendLine).toHaveBeenCalledWith("Python diagnostic");
+    expect(show).not.toHaveBeenCalled();
   });
 
   it("rejects malformed and unsafe save messages", () => {

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { toErrorMessage } from "./utils";
+import { isSafeFileName, toErrorMessage } from "./utils";
 
 export function writeResource(filePath: string, data: string): boolean {
   try {
@@ -41,9 +41,10 @@ export function saveCapture(
   data: string
 ): void {
   if (!directory) return;
-  const destination = path.join(directory, fileName);
+  let destination: string;
   try {
-    fs.writeFileSync(destination, Buffer.from(data, "base64"));
+    if (!isSafeFileName(fileName)) throw new Error("Unsafe capture file name");
+    destination = writeNewCapture(directory, fileName, Buffer.from(data, "base64"));
   } catch (error: unknown) {
     vscode.window.showErrorMessage(
       `Failed to save ${fileName}: ${toErrorMessage(error)}`
@@ -71,4 +72,34 @@ export function saveCapture(
         `Failed to open ${fileName}: ${toErrorMessage(error)}`
       );
     });
+}
+
+// Exclusive creation never follows an existing symlink or truncates a capture.
+// Keep both captures when the runtime generates the same name more than once.
+function writeNewCapture(directory: string, fileName: string, data: Buffer): string {
+  const extension = path.extname(fileName);
+  const stem = path.basename(fileName, extension);
+  for (let suffix = 0; suffix < 10000; suffix++) {
+    const name = suffix === 0 ? fileName : `${stem} (${suffix})${extension}`;
+    const destination = path.join(directory, name);
+    let descriptor: number;
+    try {
+      descriptor = fs.openSync(destination, "wx");
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw error;
+    }
+    try {
+      try {
+        fs.writeFileSync(descriptor, data);
+      } finally {
+        fs.closeSync(descriptor);
+      }
+    } catch (error: unknown) {
+      fs.unlinkSync(destination);
+      throw error;
+    }
+    return destination;
+  }
+  throw new Error("No unused capture file name is available");
 }

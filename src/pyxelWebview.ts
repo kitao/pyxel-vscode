@@ -21,21 +21,24 @@ export class PyxelWebviewManager {
   initialize(
     panel: vscode.WebviewPanel,
     onReady: () => void,
-    onSaved?: (fileName: string, data: string) => void
+    onSaved?: (fileName: string, data: string, sessionId?: number) => void,
+    // The host already owns this exact resource path; it may contain a POSIX backslash.
+    resourceFileName?: string
   ): void {
-    panel.webview.options = { enableScripts: true, localResourceRoots: [] };
+    const webview = panel.webview;
+    webview.options = { enableScripts: true, localResourceRoots: [] };
     try {
-      panel.webview.html = getWebviewHtml(this.loadScript());
+      webview.html = getWebviewHtml(this.loadScript());
     } catch (error: unknown) {
       this.reportError(
-        panel.webview,
+        webview,
         `Failed to load the Pyxel Webview script: ${toErrorMessage(error)}`
       );
       return;
     }
     this.track(panel);
 
-    panel.webview.onDidReceiveMessage((raw: unknown) => {
+    webview.onDidReceiveMessage((raw: unknown) => {
       const message = parseWebviewMessage(raw);
       if (!message) {
         this.outputChannel.appendLine(
@@ -51,17 +54,20 @@ export class PyxelWebviewManager {
           panel.title = message.title;
           break;
         case "error":
-          this.reportError(panel.webview, message.message);
+          this.reportError(webview, message.message);
+          break;
+        case "log":
+          this.outputChannel.appendLine(message.message);
           break;
         case "saved":
           if (!onSaved) break;
-          if (!isSafeFileName(message.fileName)) {
+          if (message.fileName !== resourceFileName && !isSafeFileName(message.fileName)) {
             this.outputChannel.appendLine(
               `Ignored save request with unsafe file name: ${message.fileName}`
             );
             break;
           }
-          onSaved(message.fileName, message.data);
+          onSaved(message.fileName, message.data, message.sessionId);
           break;
       }
     });
@@ -95,16 +101,17 @@ export class PyxelWebviewManager {
   }
 
   private track(panel: vscode.WebviewPanel): void {
-    if (panel.active) this.activeWebview = panel.webview;
+    const webview = panel.webview;
+    if (panel.active) this.activeWebview = webview;
     panel.onDidChangeViewState(() => {
       if (panel.active) {
-        this.activeWebview = panel.webview;
-      } else if (this.activeWebview === panel.webview) {
+        this.activeWebview = webview;
+      } else if (this.activeWebview === webview) {
         this.activeWebview = undefined;
       }
     });
     panel.onDidDispose(() => {
-      if (this.activeWebview === panel.webview) {
+      if (this.activeWebview === webview) {
         this.activeWebview = undefined;
       }
     });

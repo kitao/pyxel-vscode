@@ -19,6 +19,8 @@ export class RunPanelController {
   private session: RunSession | undefined;
   private reloadTimer: NodeJS.Timeout | undefined;
   private pendingRun: symbol | undefined;
+  private nextSessionId = 0;
+  private readonly captureDirectories = new Map<number, string>();
 
   constructor(
     private readonly webviews: PyxelWebviewManager,
@@ -30,6 +32,7 @@ export class RunPanelController {
     this.cancelPendingReload();
     this.session?.panel.dispose();
     this.session = undefined;
+    this.captureDirectories.clear();
   }
 
   handleFileSave(filePath: string): void {
@@ -104,12 +107,16 @@ export class RunPanelController {
       () => {
         if (this.session?.panel === panel) this.sendRunMessage(this.session);
       },
-      (fileName, data) => saveCapture(this.session?.directory, fileName, data)
+      (fileName, data, sessionId) => {
+        if (sessionId === undefined) return;
+        saveCapture(this.captureDirectories.get(sessionId), fileName, data);
+      }
     );
     panel.onDidDispose(() => {
       this.pendingRun = undefined;
       this.cancelPendingReload();
       this.session = undefined;
+      this.captureDirectories.clear();
     });
     return panel;
   }
@@ -144,8 +151,11 @@ export class RunPanelController {
       return false;
     }
     this.webviews.resetErrorState(session.panel.webview);
+    const sessionId = this.nextSessionId++;
+    this.captureDirectories.set(sessionId, session.directory);
     this.webviews.post(session.panel.webview, {
       command: "run",
+      sessionId,
       scriptName: session.scriptName,
       files,
     });

@@ -1,5 +1,11 @@
 # Development
 
+## Scope
+
+This extension embeds Pyxel's existing Web runtime and editor in VS Code.
+Keep it lightweight: prefer small integration fixes and leave editor behavior
+and resource management to Pyxel.
+
 ## Setup
 
 ```bash

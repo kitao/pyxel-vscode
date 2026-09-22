@@ -150,4 +150,36 @@ describe("file output", () => {
     expect(fs.writeFileSync).not.toHaveBeenCalled();
     expect(vscodeState.showInformationMessage).not.toHaveBeenCalled();
   });
+
+  it("keeps existing captures and chooses the next available name", () => {
+    fs.writeFileSync(path.join(tmpDir, "capture.png"), "original");
+    fs.writeFileSync(path.join(tmpDir, "capture (1).png"), "earlier");
+    saveCapture(tmpDir, "capture.png", Buffer.from("new").toString("base64"));
+    expect(fs.readFileSync(path.join(tmpDir, "capture.png"), "utf8")).toBe("original");
+    expect(fs.readFileSync(path.join(tmpDir, "capture (1).png"), "utf8")).toBe("earlier");
+    expect(fs.readFileSync(path.join(tmpDir, "capture (2).png"), "utf8")).toBe("new");
+  });
+
+  it("does not follow a capture name that is an existing symlink", () => {
+    const target = path.join(tmpDir, "private.txt");
+    const link = path.join(tmpDir, "capture.png");
+    fs.writeFileSync(target, "private");
+    fs.symlinkSync(target, link);
+    saveCapture(tmpDir, "capture.png", Buffer.from("capture").toString("base64"));
+    expect(fs.readFileSync(target, "utf8")).toBe("private");
+    expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(path.join(tmpDir, "capture (1).png"), "utf8")).toBe("capture");
+  });
+
+  it("removes a partially written new capture when writing fails", async () => {
+    const actualFs = await vi.importActual<typeof import("fs")>("fs");
+    vi.mocked(fs.writeFileSync).mockImplementationOnce((destination) => {
+      actualFs.writeFileSync(destination, "partial");
+      throw new Error("disk full");
+    });
+    saveCapture(tmpDir, "capture.png", "AA==");
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
+    expect(vscodeState.showErrorMessage).toHaveBeenCalledWith("Failed to save capture.png: disk full");
+    expect(vscodeState.showInformationMessage).not.toHaveBeenCalled();
+  });
 });

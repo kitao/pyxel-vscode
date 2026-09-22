@@ -21,12 +21,25 @@ describe("parseWebviewMessage", () => {
     });
   });
 
+  it("parses stdout messages", () => {
+    expect(parseWebviewMessage({ command: "log", message: "diagnostic" }))
+      .toEqual({ command: "log", message: "diagnostic" });
+  });
+
   it("parses a saved message", () => {
     expect(parseWebviewMessage({
       command: "saved",
       fileName: "a.png",
       data: "AA==",
     })).toEqual({ command: "saved", fileName: "a.png", data: "AA==" });
+  });
+
+  it("accepts capture session IDs and rejects invalid ones", () => {
+    const capture = { command: "saved", sessionId: 0, fileName: "a.png", data: "AA==" };
+    expect(parseWebviewMessage(capture)).toEqual(capture);
+    for (const sessionId of [-1, 0.5, "0", Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(parseWebviewMessage({ ...capture, sessionId })).toBeUndefined();
+    }
   });
 
   it("rejects non-objects and unknown commands", () => {

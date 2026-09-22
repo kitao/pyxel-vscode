@@ -27,6 +27,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run package
+      - name: Run the extension in the oldest supported VS Code
+        run: xvfb-run -a npm run test:integration
+        env:
+          VSCODE_VERSION: "1.85.0"
+      - name: Run the extension in the current stable VS Code
+        run: xvfb-run -a npm run test:integration
+        env:
+          VSCODE_VERSION: "stable"
       - run: gh release create "$GITHUB_REF_NAME" ./*.vsix --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
         env:
           GH_TOKEN: ${{ github.token }}

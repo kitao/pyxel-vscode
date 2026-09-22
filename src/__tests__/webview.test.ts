@@ -5,6 +5,7 @@ import {
   keySteps,
   PyxelRunner,
   RUNTIME_LOAD_ERROR,
+  RUNTIME_START_TIMEOUT_MS,
   start,
   RUN_SCRIPT,
   toErrorMessage,
@@ -80,8 +81,8 @@ function createRunner(overrides: Partial<RunnerHost> = {}) {
     installSaveBridge: vi.fn(),
     launch: vi.fn(async () => {}),
     reset: vi.fn(async () => {}),
-    reportError: vi.fn(),
     reportFatal: vi.fn(),
+    reload: vi.fn(),
     ...overrides,
   };
   return { host, runner: new PyxelRunner(host) };
@@ -96,7 +97,7 @@ describe("PyxelRunner", () => {
 
     expect(host.launch).toHaveBeenCalledExactlyOnceWith("first");
     expect(host.reset).toHaveBeenCalledExactlyOnceWith("second");
-    expect(host.installSaveBridge).toHaveBeenCalledOnce();
+    expect(host.installSaveBridge).toHaveBeenCalledTimes(2);
   });
 
   it("reports a missing runtime without touching Pyxel", async () => {
@@ -137,12 +138,12 @@ describe("PyxelRunner", () => {
     failLaunch(new Error("no wasm"));
     await first;
 
-    expect(host.reportError)
+    expect(host.reportFatal)
       .toHaveBeenCalledWith("Failed to launch Pyxel: no wasm");
     expect(host.reset).not.toHaveBeenCalled();
   });
 
-  it("stays usable after a failed reset", async () => {
+  it("reloads the page before retrying a failed reset", async () => {
     const reset = vi.fn()
       .mockRejectedValueOnce(new Error("stuck"))
       .mockResolvedValueOnce(undefined);
@@ -152,9 +153,33 @@ describe("PyxelRunner", () => {
     await runner.run("second");
     await runner.run("third");
 
-    expect(host.reportError)
+    expect(host.reportFatal)
       .toHaveBeenCalledWith("Failed to reset Pyxel: stuck");
-    expect(reset).toHaveBeenLastCalledWith("third");
+    expect(reset).toHaveBeenCalledExactlyOnceWith("second");
+    expect(host.reload).toHaveBeenCalledOnce();
+  });
+
+  it("times out a stalled launch and never starts a second runtime on that page", async () => {
+    vi.useFakeTimers();
+    let finishLaunch = () => {};
+    const launch = vi.fn(() => new Promise<void>((resolve) => { finishLaunch = resolve; }));
+    const { host, runner } = createRunner({ launch });
+    try {
+      const first = runner.run("first");
+      await runner.run("queued");
+      await vi.advanceTimersByTimeAsync(RUNTIME_START_TIMEOUT_MS);
+      await first;
+      expect(host.reportFatal).toHaveBeenCalledWith(expect.stringContaining("did not finish loading"));
+      await runner.run("retry");
+      finishLaunch();
+      await Promise.resolve();
+      expect(host.reload).toHaveBeenCalledOnce();
+      expect(host.launch).toHaveBeenCalledOnce();
+      expect(host.reset).not.toHaveBeenCalled();
+    } finally {
+      finishLaunch();
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -175,6 +200,7 @@ describe("Webview runtime messages", () => {
     }));
     const reset = vi.fn(async () => {});
     const originalConsoleError = console.error;
+    const originalConsoleLog = console.log;
     vi.stubGlobal("acquireVsCodeApi", () => ({ postMessage: vi.fn() }));
     vi.stubGlobal("launchPyxel", launch);
     vi.stubGlobal("resetPyxel", reset);
@@ -185,9 +211,9 @@ describe("Webview runtime messages", () => {
     vi.stubGlobal("MutationObserver", class { observe() {} });
     try {
       start();
-      receive({ data: { command: "run", scriptName: "first.py", files: { "first.py": "first" } } });
+      receive({ data: { command: "run", sessionId: 1, scriptName: "first.py", files: { "first.py": "first" } } });
       receive({ data: { command: "edit", fileName: "unused.pyxres", fileData: null, palData: null } });
-      receive({ data: { command: "run", scriptName: "last.py", files: { "last.py": "last" } } });
+      receive({ data: { command: "run", sessionId: 3, scriptName: "last.py", files: { "last.py": "last" } } });
 
       expect(view._pendingScriptName).toBe("first.py");
       expect(view._pendingFiles).toEqual({ "first.py": "first" });
@@ -200,7 +226,93 @@ describe("Webview runtime messages", () => {
       finishLaunch();
       await vi.waitFor(() => expect(reset).toHaveBeenCalledOnce());
       console.error = originalConsoleError;
+      console.log = originalConsoleLog;
       vi.unstubAllGlobals();
     }
   });
+
+  it("keeps the originating session on captured files after switching runs", async () => {
+    const harness = webviewHarness();
+    try {
+      await harness.send({ command: "run", sessionId: 11, scriptName: "one.py", files: {} });
+      const firstSave = harness.view._savePyxelFile!;
+      await harness.send({ command: "run", sessionId: 12, scriptName: "two.py", files: {} });
+      firstSave("/tmp/old.png");
+      harness.view._savePyxelFile!("/tmp/new.png");
+      expect(harness.post).toHaveBeenCalledWith({ command: "saved", sessionId: 11, fileName: "old.png", data: "AQID" });
+      expect(harness.post).toHaveBeenCalledWith({ command: "saved", sessionId: 12, fileName: "new.png", data: "AQID" });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it("preserves POSIX backslashes in resource saves without inheriting a run session", async () => {
+    const harness = webviewHarness();
+    try {
+      await harness.send({ command: "run", sessionId: 9, scriptName: "game.py", files: {} });
+      await harness.send({ command: "edit", fileName: "a\\b.pyxres", fileData: null, palData: null });
+      harness.view._savePyxelFile!("/pyxel_working_directory/a\\b.pyxres");
+      expect(harness.post).toHaveBeenCalledWith({ command: "saved", fileName: "a\\b.pyxres", data: "AQID" });
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it("reports resource read failures without sending incomplete save data", async () => {
+    const harness = webviewHarness();
+    try {
+      await harness.send({ command: "edit", fileName: "game.pyxres", fileData: null, palData: null });
+      harness.readFile.mockImplementation(() => { throw new Error("read failed"); });
+      harness.view._savePyxelFile!("/pyxel_working_directory/game.pyxres");
+      expect(harness.post).toHaveBeenCalledWith({ command: "error", message: "Failed to save /pyxel_working_directory/game.pyxres: read failed" });
+      expect(harness.post.mock.calls.some(([message]) => message.command === "saved")).toBe(false);
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it("forwards standard output without treating it as an error", () => {
+    const quiet = vi.spyOn(console, "log").mockImplementation(() => {});
+    const harness = webviewHarness();
+    try {
+      console.log("hello", 42);
+      expect(harness.post).toHaveBeenCalledWith({ command: "log", message: "hello 42" });
+      expect(harness.post.mock.calls.some(([message]) => message.command === "error")).toBe(false);
+    } finally {
+      harness.dispose();
+      quiet.mockRestore();
+    }
+  });
 });
+
+function webviewHarness() {
+  let receive = (_event: { data: HostMessage }) => {};
+  const post = vi.fn<(message: WebviewMessage) => void>();
+  const readFile = vi.fn(() => new Uint8Array([1, 2, 3]));
+  const view = {
+    addEventListener: (_name: string, listener: typeof receive) => { receive = listener; },
+    pyxelContext: { params: { script: "" }, pyodide: { FS: { readFile } } },
+    _savePyxelFile: undefined as Window["_savePyxelFile"],
+  };
+  const originalConsoleError = console.error;
+  const originalConsoleLog = console.log;
+  vi.stubGlobal("acquireVsCodeApi", () => ({ postMessage: post }));
+  vi.stubGlobal("launchPyxel", vi.fn(async () => {}));
+  vi.stubGlobal("resetPyxel", vi.fn(async () => {}));
+  vi.stubGlobal("window", view);
+  vi.stubGlobal("document", { body: {}, head: {}, querySelector: () => null });
+  vi.stubGlobal("MutationObserver", class { observe() {} });
+  start();
+  return {
+    post, readFile, view,
+    async send(message: HostMessage) {
+      receive({ data: message });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+    dispose() {
+      console.error = originalConsoleError;
+      console.log = originalConsoleLog;
+      vi.unstubAllGlobals();
+    },
+  };
+}

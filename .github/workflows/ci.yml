@@ -25,7 +25,14 @@ jobs:
           path: "*.vsix"
 
   integration:
+    name: VS Code ${{ matrix.vscode-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vscode-version: ["1.85.0", "stable"]
+    env:
+      VSCODE_VERSION: ${{ matrix.vscode-version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -33,9 +40,10 @@ jobs:
           node-version: 22
           cache: npm
       - uses: actions/cache@v6
+        if: matrix.vscode-version != 'stable'
         with:
           path: .vscode-test
-          key: vscode-test-${{ runner.os }}-${{ hashFiles('src/test/runTest.ts') }}
+          key: vscode-test-${{ runner.os }}-${{ matrix.vscode-version }}-${{ hashFiles('src/test/runTest.ts') }}
       - run: npm ci
-      - name: Run the extension in the oldest supported VS Code
+      - name: Run the extension in VS Code ${{ matrix.vscode-version }}
         run: xvfb-run -a npm run test:integration

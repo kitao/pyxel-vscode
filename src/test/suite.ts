@@ -38,30 +38,44 @@ export async function run(): Promise<void> {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-smoke-"));
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   assert.equal(tabs().length, 0, "the explorer-run scenario starts without editors");
-  const existingTabs = new Set(tabs());
+  let tabListener: vscode.Disposable | undefined;
   try {
     const script = path.join(directory, "game.py");
     fs.writeFileSync(script, "import pyxel\n");
     await vscode.commands.executeCommand("pyxel.run", vscode.Uri.file(script));
     const opened = await eventually(() => tabs().some((tab) =>
-      !existingTabs.has(tab) && tab.input instanceof vscode.TabInputWebview
+      tab.input instanceof vscode.TabInputWebview
     ));
     assert.ok(opened, "run panel opened");
-    const runTab = tabs().find((tab) => !existingTabs.has(tab));
+    const runTab = tabs().find((tab) => tab.input instanceof vscode.TabInputWebview);
     assert.ok(runTab && !runTab.isPreview, "the game opens as a persistent tab");
+    const viewType = (runTab.input as vscode.TabInputWebview).viewType;
+    const isRunTab = (tab: vscode.Tab) =>
+      tab.input instanceof vscode.TabInputWebview && tab.input.viewType === viewType;
+    // Group updates can replace Tab API objects without closing the panel.
+    const currentRunTabs = () => tabs().filter(isRunTab);
+    let runPanelClosed = false;
+    tabListener = vscode.window.tabGroups.onDidChangeTabs((event) => {
+      if (event.closed.some(isRunTab)) runPanelClosed = true;
+    });
     await vscode.window.showTextDocument(vscode.Uri.file(script), { preview: true });
     assert.ok(await eventually(() => tabs().some((tab) =>
       tab.input instanceof vscode.TabInputText && tab.input.uri.fsPath === script
     )), "the game source opens");
-    assert.ok(tabs().includes(runTab), "opening code preserves the running game panel");
+    assert.equal(currentRunTabs().length, 1,
+      "opening code preserves the running game panel");
+    assert.ok(!runPanelClosed, "opening code does not close the running game panel");
 
     const second = path.join(directory, "second.py");
     fs.writeFileSync(second, "import pyxel\n");
     await vscode.commands.executeCommand("pyxel.run", vscode.Uri.file(second));
-    assert.ok(await eventually(() => runTab?.label === "Pyxel — second.py"),
+    assert.ok(await eventually(() => currentRunTabs().some((tab) =>
+      tab.label === "Pyxel — second.py"
+    )),
       "the existing run panel switches to the next script");
     assert.equal(tabs().filter((tab) => tab.input instanceof vscode.TabInputWebview).length, 1,
       "running again does not open another panel");
+    assert.ok(!runPanelClosed, "running again reuses the existing game panel");
 
     // New Resource opens a path before it exists on disk.
     const resource = vscode.Uri.file(path.join(directory, "new.PYXRES"));
@@ -72,7 +86,8 @@ export async function run(): Promise<void> {
       tab.input.uri.toString() === resource.toString()
     )), "a new resource opens in the custom editor");
   } finally {
-    await vscode.window.tabGroups.close(tabs().filter((tab) => !existingTabs.has(tab)));
+    tabListener?.dispose();
+    await vscode.window.tabGroups.close(tabs());
     fs.rmSync(directory, { recursive: true, force: true });
   }
 }

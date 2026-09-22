@@ -38,7 +38,8 @@ afterEach(async () => {
 function mockResponse(
   statusCode: number,
   body: string,
-  headers: IncomingMessage["headers"] = {}
+  headers: IncomingMessage["headers"] = {},
+  beforeEnd?: () => void
 ): void {
   const fakeGet = (
     _url: string | URL,
@@ -54,6 +55,7 @@ function mockResponse(
     request.destroy = vi.fn().mockReturnValue(request);
     queueMicrotask(() => {
       callback(response);
+      beforeEnd?.();
       stream.end(body);
     });
     return request;
@@ -72,12 +74,13 @@ describe("copyExamples helpers", () => {
     );
   });
 
-  it("selects example blobs and skips pycache entries", () => {
+  it("selects Web example blobs and skips pycache and the desktop-only flip sample", () => {
     const result = selectExampleFiles({
       tree: [
         { type: "blob", path: `${EXAMPLES_PREFIX}01_hello.py` },
         { type: "blob", path: `${EXAMPLES_PREFIX}assets/player.pyxres` },
         { type: "blob", path: `${EXAMPLES_PREFIX}__pycache__/ignored.pyc` },
+        { type: "blob", path: `${EXAMPLES_PREFIX}99_flip_animation.py` },
         { type: "tree", path: `${EXAMPLES_PREFIX}nested` },
         { type: "blob", path: "README.md" },
       ],
@@ -220,6 +223,87 @@ describe("copyExamples", () => {
     expect(showErrorMessage).toHaveBeenCalledWith(
       "Failed to copy examples: rename failed"
     );
+  });
+
+  it("confirms after downloading and preserves the latest edits when declined", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-copy-test-"));
+    const examplesDir = path.join(tmpDir, "pyxel_examples");
+    const editedFile = path.join(examplesDir, "work.py");
+    fs.mkdirSync(examplesDir);
+    fs.writeFileSync(editedFile, "original work");
+    mockJsonResponse(JSON.stringify({
+      tree: [{ type: "blob", path: `${EXAMPLES_PREFIX}new.py` }],
+    }));
+    mockResponse(200, "new", {}, () => {
+      fs.writeFileSync(editedFile, "latest user work");
+    });
+    const { api, showWarningMessage, showInformationMessage, showErrorMessage } =
+      createVsCodeApi(createToken().token);
+    showWarningMessage.mockImplementation(() => {
+      expect(https.get).toHaveBeenCalledTimes(2);
+      expect(fs.readFileSync(editedFile, "utf8")).toBe("latest user work");
+      return Promise.resolve(undefined);
+    });
+
+    await copyExamples(api);
+
+    expect(showWarningMessage).toHaveBeenCalledOnce();
+    expect(fs.readFileSync(editedFile, "utf8")).toBe("latest user work");
+    expect(fs.readdirSync(tmpDir)).toEqual(["pyxel_examples"]);
+    expect(showInformationMessage).not.toHaveBeenCalled();
+    expect(showErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("asks before replacing a destination created during downloading", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-copy-test-"));
+    const examplesDir = path.join(tmpDir, "pyxel_examples");
+    mockJsonResponse(JSON.stringify({
+      tree: [{ type: "blob", path: `${EXAMPLES_PREFIX}new.py` }],
+    }));
+    mockResponse(200, "new", {}, () => {
+      fs.mkdirSync(examplesDir);
+      fs.writeFileSync(path.join(examplesDir, "work.py"), "created while downloading");
+    });
+    const { api, showWarningMessage, showInformationMessage, showErrorMessage } =
+      createVsCodeApi(createToken().token);
+    showWarningMessage.mockImplementation(() => {
+      expect(fs.readFileSync(path.join(examplesDir, "work.py"), "utf8"))
+        .toBe("created while downloading");
+      return Promise.resolve("Replace");
+    });
+
+    await copyExamples(api);
+
+    expect(showWarningMessage).toHaveBeenCalledWith(
+      "The folder pyxel_examples already exists here. Replace it?",
+      { modal: true },
+      "Replace"
+    );
+    expect(fs.readdirSync(examplesDir)).toEqual(["new.py"]);
+    expect(showInformationMessage).toHaveBeenCalledWith("Copied 1 example files.");
+    expect(showErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("keeps existing files without asking to replace them when downloading fails", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-copy-test-"));
+    const examplesDir = path.join(tmpDir, "pyxel_examples");
+    fs.mkdirSync(examplesDir);
+    fs.writeFileSync(path.join(examplesDir, "work.py"), "user work");
+    mockJsonResponse(JSON.stringify({
+      tree: [{ type: "blob", path: `${EXAMPLES_PREFIX}new.py` }],
+    }));
+    mockResponse(503, "unavailable");
+    const { api, showWarningMessage, showErrorMessage, showInformationMessage } =
+      createVsCodeApi(createToken().token);
+
+    await copyExamples(api);
+
+    expect(fs.readFileSync(path.join(examplesDir, "work.py"), "utf8"))
+      .toBe("user work");
+    expect(fs.readdirSync(tmpDir)).toEqual(["pyxel_examples"]);
+    expect(showWarningMessage).not.toHaveBeenCalled();
+    expect(showInformationMessage).not.toHaveBeenCalled();
+    expect(showErrorMessage).toHaveBeenCalledWith(expect.stringContaining("HTTP 503"));
   });
 
   it("aborts an active download when copying is cancelled", async () => {

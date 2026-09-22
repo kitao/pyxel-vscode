@@ -8,6 +8,7 @@ import type { PyxelWebviewManager } from "../pyxelWebview";
 const vscodeState = vi.hoisted(() => ({
   showErrorMessage: vi.fn(),
   showInformationMessage: vi.fn(),
+  showWarningMessage: vi.fn(),
 }));
 
 vi.mock("vscode", () => ({
@@ -16,11 +17,18 @@ vi.mock("vscode", () => ({
   window: {
     showErrorMessage: vscodeState.showErrorMessage,
     showInformationMessage: vscodeState.showInformationMessage,
+    showWarningMessage: vscodeState.showWarningMessage,
   },
   workspace: { asRelativePath: (fsPath: string) => fsPath },
 }));
 
+vi.mock("../fileOutput", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../fileOutput")>();
+  return { ...original, writeResource: vi.fn(original.writeResource) };
+});
+
 import { PyxelFileProvider } from "../customEditors";
+import { writeResource } from "../fileOutput";
 
 let tmpDir: string;
 
@@ -28,6 +36,7 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pyxel-editor-test-"));
   vscodeState.showErrorMessage.mockReset();
   vscodeState.showInformationMessage.mockReset();
+  vscodeState.showWarningMessage.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -127,10 +136,92 @@ describe("Pyxel Editor (.pyxres)", () => {
     fs.writeFileSync(filePath, "old");
     const harness = createHarness(filePath);
 
+    harness.ready();
     harness.save("game.pyxres", base64("new"));
 
     expect(fs.readFileSync(filePath, "utf8")).toBe("new");
     expect(harness.onResourceSaved).toHaveBeenCalledWith(filePath);
+  });
+
+  it("requires confirmation for external edits and preserves them when cancelled", async () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    const harness = createHarness(filePath);
+    harness.ready();
+    fs.writeFileSync(filePath, "external");
+    harness.save("game.pyxres", base64("mine"));
+    await Promise.resolve();
+    expect(vscodeState.showWarningMessage).toHaveBeenCalledWith(
+      expect.stringContaining("changed on disk"), { modal: true }, "Overwrite"
+    );
+    expect(fs.readFileSync(filePath, "utf8")).toBe("external");
+    expect(harness.onResourceSaved).not.toHaveBeenCalled();
+  });
+
+  it("allows a confirmed overwrite and refreshes the baseline for later saves", async () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    const harness = createHarness(filePath);
+    harness.ready();
+    fs.writeFileSync(filePath, "external");
+    vscodeState.showWarningMessage.mockResolvedValue("Overwrite");
+    harness.save("game.pyxres", base64("mine"));
+    await vi.waitFor(() => expect(fs.readFileSync(filePath, "utf8")).toBe("mine"));
+    harness.save("game.pyxres", base64("later"));
+    expect(fs.readFileSync(filePath, "utf8")).toBe("later");
+    expect(vscodeState.showWarningMessage).toHaveBeenCalledOnce();
+  });
+
+  it("stops if the file changes again while overwrite confirmation is open", async () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    const harness = createHarness(filePath);
+    harness.ready();
+    fs.writeFileSync(filePath, "external");
+    let confirm = (_choice: string) => {};
+    vscodeState.showWarningMessage.mockImplementation(() => new Promise<string>((resolve) => { confirm = resolve; }));
+    harness.save("game.pyxres", base64("mine"));
+    fs.writeFileSync(filePath, "newer external");
+    confirm("Overwrite");
+    await vi.waitFor(() => expect(vscodeState.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining("changed again")
+    ));
+    expect(fs.readFileSync(filePath, "utf8")).toBe("newer external");
+    expect(harness.onResourceSaved).not.toHaveBeenCalled();
+  });
+
+  it("requires confirmation if a new resource path was created externally", async () => {
+    const filePath = path.join(tmpDir, "new.pyxres");
+    const harness = createHarness(filePath);
+    harness.ready();
+    fs.writeFileSync(filePath, "external");
+    harness.save("new.pyxres", base64("mine"));
+    await Promise.resolve();
+    expect(vscodeState.showWarningMessage).toHaveBeenCalledOnce();
+    expect(fs.readFileSync(filePath, "utf8")).toBe("external");
+  });
+
+  it("creates a new resource and keeps the last successful baseline after write failure", () => {
+    const filePath = path.join(tmpDir, "new.pyxres");
+    const harness = createHarness(filePath);
+    harness.ready();
+    harness.save("new.pyxres", base64("first"));
+    expect(fs.readFileSync(filePath, "utf8")).toBe("first");
+    vi.mocked(writeResource).mockReturnValueOnce(false);
+    harness.save("new.pyxres", base64("failed"));
+    harness.save("new.pyxres", base64("retry"));
+    expect(fs.readFileSync(filePath, "utf8")).toBe("retry");
+    expect(vscodeState.showWarningMessage).not.toHaveBeenCalled();
+    expect(harness.onResourceSaved).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses saving before a resource was successfully loaded", () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    const harness = createHarness(filePath);
+    harness.save("game.pyxres", base64("replacement"));
+    expect(fs.readFileSync(filePath, "utf8")).toBe("original");
+    expect(vscodeState.showErrorMessage).toHaveBeenCalledWith(expect.stringContaining("has not loaded"));
   });
 
   it("saves any other file from the editor as a capture instead", () => {
@@ -173,14 +264,14 @@ describe("Pyxel Player (.pyxapp)", () => {
     );
   });
 
-  it("never treats a saved file as the app itself", () => {
+  it("does not overwrite the app with a capture save request", () => {
     const filePath = path.join(tmpDir, "game.pyxapp");
     fs.writeFileSync(filePath, "app");
     const harness = createHarness(filePath);
 
     harness.save("game.pyxapp", base64("overwritten"));
 
-    expect(fs.readFileSync(filePath, "utf8")).toBe("overwritten");
+    expect(fs.readFileSync(filePath, "utf8")).toBe("app");
     expect(harness.onResourceSaved).not.toHaveBeenCalled();
   });
 });

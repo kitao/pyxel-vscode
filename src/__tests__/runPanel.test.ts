@@ -4,6 +4,9 @@ import * as os from "os";
 import * as path from "path";
 import type * as vscode from "vscode";
 import type { PyxelWebviewManager } from "../pyxelWebview";
+import { saveCapture } from "../fileOutput";
+
+vi.mock("../fileOutput", () => ({ saveCapture: vi.fn() }));
 
 const vscodeState = vi.hoisted(() => ({
   autoReload: true,
@@ -40,6 +43,7 @@ beforeEach(() => {
   vscodeState.createWebviewPanel.mockReset();
   vscodeState.showErrorMessage.mockReset();
   vscodeState.textDocuments = [];
+  vi.mocked(saveCapture).mockClear();
 });
 
 afterEach(() => {
@@ -49,6 +53,7 @@ afterEach(() => {
 
 function createHarness() {
   let readyHandler = () => {};
+  let savedHandler = (_name: string, _data: string, _sessionId?: number) => {};
   let disposeHandler = () => {};
   const panel = {
     dispose: vi.fn(),
@@ -65,8 +70,10 @@ function createHarness() {
   const resetErrorState = vi.fn();
   const webviews = {
     initialize: vi.fn(
-      (_panel: vscode.WebviewPanel, onReady: () => void) => {
+      (_panel: vscode.WebviewPanel, onReady: () => void,
+        onSaved: typeof savedHandler) => {
         readyHandler = onReady;
+        savedHandler = onSaved;
       }
     ),
     post,
@@ -83,6 +90,7 @@ function createHarness() {
     panel,
     post,
     ready: () => readyHandler(),
+    saved: (name: string, data: string, sessionId?: number) => savedHandler(name, data, sessionId),
     resetErrorState,
   };
 }
@@ -102,11 +110,35 @@ describe("RunPanelController", () => {
     expect(harness.appendLine).toHaveBeenCalledWith("--- Run game.py ---");
     expect(harness.post).toHaveBeenCalledWith(harness.panel.webview, {
       command: "run",
+      sessionId: 0,
       scriptName: "game.py",
       files: {
         "game.py": Buffer.from("print('hello')").toString("base64"),
       },
     });
+  });
+
+  it("saves delayed captures in their original project after switching scripts", async () => {
+    const first = path.join(tmpDir, "first", "game.py");
+    const second = path.join(tmpDir, "second", "game.py");
+    for (const file of [first, second]) {
+      fs.mkdirSync(path.dirname(file));
+      fs.writeFileSync(file, "pass");
+    }
+    const harness = createHarness();
+    await harness.controller.run({ fsPath: first } as vscode.Uri);
+    harness.ready();
+    const firstId = (harness.post.mock.calls[0][1] as { sessionId: number }).sessionId;
+    await harness.controller.run({ fsPath: second } as vscode.Uri);
+    const secondId = (harness.post.mock.calls[1][1] as { sessionId: number }).sessionId;
+    expect(firstId).not.toBe(secondId);
+    harness.saved("old.png", "AA==", firstId);
+    harness.saved("new.png", "AA==", secondId);
+    expect(saveCapture).toHaveBeenNthCalledWith(1, path.dirname(first), "old.png", "AA==");
+    expect(saveCapture).toHaveBeenNthCalledWith(2, path.dirname(second), "new.png", "AA==");
+    harness.dispose();
+    harness.saved("closed.png", "AA==", firstId);
+    expect(saveCapture).toHaveBeenLastCalledWith(undefined, "closed.png", "AA==");
   });
 
   it("debounces reloads for saved project files", async () => {

@@ -1,3 +1,11 @@
+## 1.0.2
+
+- Ask before overwriting resource changes made outside the editor
+- Keep existing captures and save delayed captures beside their original game
+- Confirm example folder replacement after downloading and omit the native-only flip animation
+- Show runtime startup failures with a Retry button and include Python output in the Pyxel output channel
+- Fix errors when closing panels and saving resource names containing a backslash on macOS or Linux
+
 ## 1.0.1
 
 - Remove the MCP server, the bundled skill, and pyxel.mcp.enabled
