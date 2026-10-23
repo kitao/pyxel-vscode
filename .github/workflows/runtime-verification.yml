@@ -1,0 +1,34 @@
+name: Runtime verification
+
+on:
+  push:
+    branches: ["codex/pyxel-vscode-1.0.3"]
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run compile
+      - name: Prepare browser test
+        run: |
+          npm install --prefix "$RUNNER_TEMP/runtime-check" playwright
+          "$RUNNER_TEMP/runtime-check/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Test the pinned runtime and Webview content security policy
+        run: node scripts/runtime-smoke.cjs
+        env:
+          RUNTIME_TEST_MODULE: ${{ runner.temp }}/runtime-check/node_modules/playwright
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: runtime-verification
+          path: runtime-verification/
