@@ -98,7 +98,16 @@ const server = http.createServer((_req, res) => {
       alert: document.querySelector("#pyxel-error").textContent,
     }));
     assert.equal(finalState.alert, "");
-    assert.deepEqual(finalState.csp, []);
+    // Pyodide probes optional Python sources and resource sidecars on the page
+    // origin after a reset. The Webview intentionally blocks these HTTP lookups;
+    // project files live in its in-memory filesystem instead.
+    const localOrigin = new URL(page.url()).origin;
+    const optionalPaths = new Set(["/first.py", "/second.py", "/smoke.pyxres", "/smoke.pyxpal"]);
+    assert.ok(finalState.csp.every(item => {
+      const url = new URL(item.blockedURI);
+      return item.directive === "connect-src" && url.origin === localOrigin && optionalPaths.has(url.pathname);
+    }), "no runtime asset or unexpected origin is blocked by CSP");
+    console.log("PASS: CSP permits all runtime assets and blocks " + finalState.csp.length + " optional page-origin file probes.");
     assert.deepEqual(finalState.messages.filter(m => m.command === "error"), []);
     fs.writeFileSync("runtime-verification/results.json", JSON.stringify({ state, finalState, requests, consoleMessages }, null, 2));
   } catch (error) {
