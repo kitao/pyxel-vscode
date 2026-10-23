@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { PYXEL_CDN_BASE, getNonce } from "./utils";
+import { PYXEL_RUNTIME_BASE, getNonce } from "./utils";
 
 // src/webview is compiled on its own; the result is inlined into the page so
 // the Webview needs no local resource roots.
@@ -20,13 +20,13 @@ export function getWebviewHtml(script: string): string {
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src https://cdn.jsdelivr.net;
-      script-src 'nonce-${nonce}' https://cdn.jsdelivr.net 'unsafe-eval';
-      style-src https://cdn.jsdelivr.net 'unsafe-inline';
-      img-src https://cdn.jsdelivr.net data: blob:;
-      connect-src https://cdn.jsdelivr.net blob: data:;
+    content="default-src https://kitao.dev https://cdn.jsdelivr.net;
+      script-src 'nonce-${nonce}' https://kitao.dev https://cdn.jsdelivr.net 'unsafe-eval';
+      style-src https://kitao.dev https://cdn.jsdelivr.net 'unsafe-inline';
+      img-src https://kitao.dev https://cdn.jsdelivr.net data: blob:;
+      connect-src https://kitao.dev https://cdn.jsdelivr.net blob: data:;
       worker-src blob:;
-      font-src https://cdn.jsdelivr.net data:;
+      font-src https://kitao.dev https://cdn.jsdelivr.net data:;
       child-src blob:;">
   <style>
     body {
@@ -48,7 +48,7 @@ export function getWebviewHtml(script: string): string {
 </head>
 <body>
   <div id="pyxel-error" role="alert"></div>
-  <script src="${PYXEL_CDN_BASE}/pyxel.js"></script>
+  <script src="${PYXEL_RUNTIME_BASE}/pyxel.js"></script>
   <script type="module" nonce="${nonce}">
 ${inlineScript}
   </script>

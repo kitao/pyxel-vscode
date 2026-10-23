@@ -10,7 +10,7 @@ vi.mock("vscode", () => ({
 
 import { createDocumentationCommand } from "../documentationPanels";
 
-const URL = "https://kitao.github.io/pyxel/web/api-reference/";
+const URL = "https://kitao.dev/pyxel/api-reference/";
 
 function createPanel() {
   let disposeHandler = () => {};
@@ -51,7 +51,7 @@ describe("createDocumentationCommand", () => {
 
     expect(panel.webview.html).toContain(`<iframe src="${URL}"`);
     expect(panel.webview.html).toContain("default-src 'none'");
-    expect(panel.webview.html).toContain("frame-src https://kitao.github.io");
+    expect(panel.webview.html).toContain("frame-src https://kitao.dev");
   });
 
   it("reveals the panel it already opened instead of a second one", () => {

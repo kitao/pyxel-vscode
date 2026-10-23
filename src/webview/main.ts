@@ -20,7 +20,7 @@ export type WebviewMessage =
   | { command: "log"; message: string }
   | { command: "saved"; fileName: string; data: string; sessionId?: number };
 
-// Provided by VS Code and by the Pyxel Web runtime loaded from the CDN.
+// Provided by VS Code and by the Pyxel Web runtime loaded from kitao.dev.
 declare function acquireVsCodeApi(): {
   postMessage(message: WebviewMessage): void;
 };
@@ -104,7 +104,7 @@ pyxel.cli.play_pyxel_app(name)
 `;
 
 export const RUNTIME_LOAD_ERROR =
-  "Failed to load the Pyxel runtime from cdn.jsdelivr.net. " +
+  "Failed to load the Pyxel runtime from kitao.dev. " +
   "Check your network connection, then retry loading this panel.";
 
 export const RUNTIME_START_TIMEOUT_MS = 60_000;

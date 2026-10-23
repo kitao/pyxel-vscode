@@ -40,14 +40,15 @@ CI also runs `npm run test:integration`, which downloads VS Code into
 and opening a new resource in the real editor. Run it yourself when you
 change activation, panels, custom editors, `contributes`, or `src/test`.
 
-The integration smoke test does not wait for the CDN runtime. For Webview
+The integration smoke test does not wait for the Web runtime. For Webview
 changes, also launch a game with the pinned runtime, run another script while
 it loads, and open and save a resource in Pyxel Editor.
 
 ## Pinned upstream version
 
 `PYXEL_VERSION` in `src/utils.ts` pins the Pyxel Web runtime loaded from
-jsDelivr and the examples downloaded by `Pyxel: Copy Examples`.
+`https://kitao.dev/pyxel/<version>/pyxel.js` and the examples downloaded from
+jsDelivr by `Pyxel: Copy Examples`. Pyodide dependencies also load from jsDelivr.
 
 Runtime upgrades are verified by launching the Webview against the new
 runtime, not only by unit tests.

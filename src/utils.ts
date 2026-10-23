@@ -2,12 +2,12 @@ import * as crypto from "crypto";
 import * as path from "path";
 
 export const PYXEL_VERSION = "2.9.9";
-export const PYXEL_CDN_BASE =
-  `https://cdn.jsdelivr.net/gh/kitao/pyxel@v${PYXEL_VERSION}/wasm`;
+export const PYXEL_RUNTIME_BASE =
+  `https://kitao.dev/pyxel/${PYXEL_VERSION}`;
 export const PYXEL_API_REFERENCE_URL =
-  "https://kitao.github.io/pyxel/web/api-reference/";
+  "https://kitao.dev/pyxel/api-reference/";
 export const PYXEL_EDITOR_MANUAL_URL =
-  "https://kitao.github.io/pyxel/web/editor-manual/";
+  "https://kitao.dev/pyxel/editor-manual/";
 
 export function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

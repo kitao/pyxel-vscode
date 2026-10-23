@@ -23,7 +23,7 @@ export function createDocumentationCommand(
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none';
-      frame-src https://kitao.github.io;
+      frame-src https://kitao.dev;
       style-src 'unsafe-inline';">
   <style>
     html, body, iframe {

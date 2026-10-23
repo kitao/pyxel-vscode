@@ -16,9 +16,9 @@ describe("getWebviewHtml", () => {
     expect(html).toContain('<div id="pyxel-error" role="alert">');
   });
 
-  it("loads the pinned Pyxel runtime from the CDN", () => {
+  it("loads the pinned Pyxel runtime from kitao.dev", () => {
     expect(getWebviewHtml(SCRIPT)).toContain(
-      `https://cdn.jsdelivr.net/gh/kitao/pyxel@v${PYXEL_VERSION}/wasm/pyxel.js`
+      `https://kitao.dev/pyxel/${PYXEL_VERSION}/pyxel.js`
     );
   });
 
@@ -30,14 +30,25 @@ describe("getWebviewHtml", () => {
     expect(html).toContain(`\n${SCRIPT}\n`);
   });
 
-  it("allows only the inlined script and the CDN to run", () => {
+  it("allows the inlined script, kitao.dev runtime, and jsDelivr dependencies to run", () => {
     const html = getWebviewHtml(SCRIPT);
     const nonce = html.match(/<script type="module" nonce="(\w+)">/)?.[1];
     const scriptSrc = html.match(/script-src ([^;]+);/)?.[1];
 
     expect(scriptSrc).toContain(`'nonce-${nonce}'`);
+    expect(scriptSrc).toContain("https://kitao.dev");
     expect(scriptSrc).toContain("https://cdn.jsdelivr.net");
     expect(scriptSrc).not.toContain("unsafe-inline");
+  });
+
+  it("allows runtime assets from kitao.dev and Pyodide assets from jsDelivr", () => {
+    const html = getWebviewHtml(SCRIPT);
+
+    for (const directive of ["connect-src", "img-src"]) {
+      const sources = html.match(new RegExp(`${directive} ([^;]+);`))?.[1];
+      expect(sources).toContain("https://kitao.dev");
+      expect(sources).toContain("https://cdn.jsdelivr.net");
+    }
   });
 
   it("keeps an inlined </script in the source from ending the tag", () => {

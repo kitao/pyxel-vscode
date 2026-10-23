@@ -44,7 +44,7 @@ files.
 ## Requirements and limitations
 
 - VS Code 1.85 or newer.
-- The Pyxel Web runtime (Pyxel 2.9.9) is loaded from jsDelivr, so an internet
+- The Pyxel Web runtime (Pyxel 2.9.9) is loaded from kitao.dev, so an internet
   connection is required to launch games. If loading fails or stalls, use
   **Retry** in the panel after checking your connection.
 - Project files are bundled into the runtime with these limits: 5 MB per file,

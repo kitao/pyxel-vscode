@@ -1,3 +1,8 @@
+## 1.0.3
+
+- Load the pinned Pyxel 2.9.9 Web runtime from kitao.dev
+- Update API Reference and Editor Manual links to kitao.dev
+
 ## 1.0.2
 
 - Ask before overwriting resource changes made outside the editor
