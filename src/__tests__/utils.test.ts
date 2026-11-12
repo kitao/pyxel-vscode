@@ -7,8 +7,8 @@ import {
 } from "../utils";
 
 describe("PYXEL_VERSION", () => {
-  it("pins Pyxel to version 2.9.9", () => {
-    expect(PYXEL_VERSION).toBe("2.9.9");
+  it("pins Pyxel to version 3.0.1", () => {
+    expect(PYXEL_VERSION).toBe("3.0.1");
   });
 });
 

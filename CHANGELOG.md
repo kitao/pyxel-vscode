@@ -1,3 +1,7 @@
+## 1.0.4
+
+- Update the pinned Pyxel Web runtime and official examples to Pyxel 3.0.1
+
 ## 1.0.3
 
 - Load the pinned Pyxel 2.9.9 Web runtime from kitao.dev
