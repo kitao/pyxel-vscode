@@ -1,104 +1,57 @@
 import type * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { httpsGet } from "./http";
-import { PYXEL_VERSION, toErrorMessage } from "./utils";
+import { extractDirectory } from "./zip";
+import { toErrorMessage } from "./utils";
 
-export const EXAMPLES_PREFIX = "python/pyxel/examples/";
-const CDN_BASE = `https://cdn.jsdelivr.net/gh/kitao/pyxel@v${PYXEL_VERSION}`;
-const DOWNLOAD_CONCURRENCY = 8;
-
-type VsCodeApi = typeof vscode;
-
-export async function copyExamples(vscodeApi: VsCodeApi): Promise<void> {
-  const folders = await vscodeApi.window.showOpenDialog({
+export async function copyExamples(
+  api: typeof vscode,
+  runtimeDir: string
+): Promise<void> {
+  const folders = await api.window.showOpenDialog({
     canSelectFolders: true,
     canSelectFiles: false,
     openLabel: "Copy Examples Here",
   });
-  if (!folders || folders.length === 0) return;
-  const targetDir = folders[0].fsPath;
-  const examplesDir = path.join(targetDir, "pyxel_examples");
+  if (!folders?.length) return;
+  const parent = folders[0].fsPath;
+  const destination = path.join(parent, "pyxel_examples");
 
-  await vscodeApi.window.withProgress(
-    {
-      location: vscodeApi.ProgressLocation.Notification,
-      title: "Copying Pyxel examples...",
-      cancellable: true,
-    },
-    async (_progress, token) => {
-      // Keep the existing examples until the replacement is ready.
-      let tmpDir: string | undefined;
-      try {
-        tmpDir = fs.mkdtempSync(path.join(targetDir, ".pyxel_examples-"));
-        const treeJson: unknown = JSON.parse(
-          (await httpsGet(getExamplesTreeUrl(), 5, token)).toString()
-        );
-        const files = selectExampleFiles(treeJson);
-        await downloadAll(files, tmpDir, token);
-        if (token.isCancellationRequested) return;
-        // Confirm the current destination only after the download is ready.
-        if (fs.existsSync(examplesDir)) {
-          const choice = await vscodeApi.window.showWarningMessage(
-            "The folder pyxel_examples already exists here. Replace it?",
-            { modal: true },
-            "Replace"
-          );
-          if (choice !== "Replace" || token.isCancellationRequested) return;
-        }
-        replaceExamplesDirectory(tmpDir, examplesDir);
-        vscodeApi.window.showInformationMessage(
-          `Copied ${files.length} example files.`
-        );
-      } catch (error: unknown) {
-        if (token.isCancellationRequested) return;
-        vscodeApi.window.showErrorMessage(
-          `Failed to copy examples: ${toErrorMessage(error)}`
-        );
-      } finally {
-        if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
-      }
+  let staged: string | undefined;
+  try {
+    staged = await fs.promises.mkdtemp(path.join(parent, ".pyxel_examples-"));
+    await extractExamples(runtimeDir, staged);
+    if (fs.existsSync(destination)) {
+      const choice = await api.window.showWarningMessage(
+        "Replace pyxel_examples and all changes you have made inside it?",
+        { modal: true },
+        "Replace"
+      );
+      if (choice !== "Replace") return;
     }
+    replaceExamplesDirectory(staged, destination);
+  } catch (error: unknown) {
+    api.window.showErrorMessage(`Failed to copy examples: ${toErrorMessage(error)}`);
+    return;
+  } finally {
+    if (staged) fs.rmSync(staged, { recursive: true, force: true });
+  }
+
+  const choice = await api.window.showInformationMessage(
+    "Copied the Pyxel examples.", "Open Hello Pyxel"
   );
+  if (choice) {
+    await api.window.showTextDocument(api.Uri.file(path.join(destination, "01_hello_pyxel.py")));
+  }
 }
 
-export function getExamplesTreeUrl(): string {
-  return `https://api.github.com/repos/kitao/pyxel/git/trees/v${PYXEL_VERSION}?recursive=1`;
-}
-
-export function selectExampleFiles(treeJson: unknown): string[] {
-  if (
-    !treeJson ||
-    typeof treeJson !== "object" ||
-    !Array.isArray((treeJson as { tree?: unknown }).tree)
-  ) {
-    throw new Error("Invalid GitHub tree response");
-  }
-  if ((treeJson as { truncated?: unknown }).truncated === true) {
-    throw new Error("GitHub tree response is truncated");
-  }
-
-  const files = (treeJson as { tree: unknown[] }).tree.flatMap((entry) => {
-    if (!entry || typeof entry !== "object") return [];
-    const { path: entryPath, type } = entry as {
-      path?: unknown;
-      type?: unknown;
-    };
-    if (type !== "blob" || typeof entryPath !== "string") return [];
-    if (!entryPath.startsWith(EXAMPLES_PREFIX)) return [];
-    // pyxel.flip() deliberately aborts the Web runtime.
-    if (entryPath === `${EXAMPLES_PREFIX}99_flip_animation.py`) return [];
-    if (entryPath.includes("__pycache__")) return [];
-    if (entryPath.includes("\\")) return [];
-    if (entryPath.split("/").some((part) => part === ".." || part === "")) {
-      return [];
-    }
-    return [entryPath];
-  });
-  if (files.length === 0) {
-    throw new Error("GitHub tree response contains no Pyxel examples");
-  }
-  return files;
+async function extractExamples(runtimeDir: string, destination: string): Promise<void> {
+  const wheels = (await fs.promises.readdir(runtimeDir)).filter((name) => name.endsWith(".whl"));
+  if (wheels.length !== 1) throw new Error("Expected one bundled Pyxel wheel.");
+  await extractDirectory(path.join(runtimeDir, wheels[0]), "pyxel/examples", destination,
+    (name) => name !== "99_flip_animation.py" && !name.split("/").includes("__pycache__"));
+  // Check the introductory example before offering to replace an existing copy.
+  await fs.promises.access(path.join(destination, "01_hello_pyxel.py"));
 }
 
 function replaceExamplesDirectory(
@@ -141,41 +94,4 @@ function replaceExamplesDirectory(
   if (backupRoot) {
     fs.rmSync(backupRoot, { recursive: true, force: true });
   }
-}
-
-async function downloadAll(
-  files: string[],
-  destDir: string,
-  token: vscode.CancellationToken
-): Promise<void> {
-  let next = 0;
-  let aborted = false;
-  let firstError: unknown;
-
-  async function worker(): Promise<void> {
-    while (!aborted && next < files.length && !token.isCancellationRequested) {
-      const file = files[next++];
-      try {
-        const data = await httpsGet(`${CDN_BASE}/${file}`, 5, token);
-        const filePath = path.join(destDir, file.slice(EXAMPLES_PREFIX.length));
-        fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        fs.writeFileSync(filePath, data);
-      } catch (error: unknown) {
-        if (token.isCancellationRequested) return;
-        if (!aborted) {
-          aborted = true;
-          firstError = error;
-        }
-        return;
-      }
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(DOWNLOAD_CONCURRENCY, files.length) },
-    () => worker()
-  );
-  await Promise.all(workers);
-  if (token.isCancellationRequested) return;
-  if (aborted) throw firstError;
 }

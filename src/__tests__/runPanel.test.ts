@@ -118,6 +118,20 @@ describe("RunPanelController", () => {
     });
   });
 
+  it("starts only the last selected game when the panel becomes ready", async () => {
+    const first = path.join(tmpDir, "first.py");
+    const last = path.join(tmpDir, "last.py");
+    for (const script of [first, last]) fs.writeFileSync(script, "pass");
+    const harness = createHarness();
+    await harness.controller.run({ fsPath: first } as vscode.Uri);
+    await harness.controller.run({ fsPath: last } as vscode.Uri);
+    expect(harness.post).not.toHaveBeenCalled();
+    harness.ready();
+    expect(harness.post).toHaveBeenCalledExactlyOnceWith(
+      harness.panel.webview, expect.objectContaining({ scriptName: "last.py" })
+    );
+  });
+
   it("saves delayed captures in their original project after switching scripts", async () => {
     const first = path.join(tmpDir, "first", "game.py");
     const second = path.join(tmpDir, "second", "game.py");
@@ -261,6 +275,7 @@ describe("RunPanelController", () => {
     await harness.controller.run({ fsPath: path.join(tmpDir, "missing.py") } as vscode.Uri);
     harness.ready();
 
+    expect(vscodeState.createWebviewPanel).not.toHaveBeenCalled();
     expect(harness.post).not.toHaveBeenCalled();
     expect(vscodeState.showErrorMessage).toHaveBeenCalledWith(
       expect.stringContaining("missing.py was not included")

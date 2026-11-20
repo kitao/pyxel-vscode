@@ -28,11 +28,10 @@ export function isWatchedFile(savedPath: string, rootDir: string): boolean {
   );
 }
 
-export function collectFiles(rootDir: string): CollectedFiles {
+export function collectFiles(rootDir: string, entryScript?: string): CollectedFiles {
   const files = Object.create(null) as Record<string, string>;
   const skipped: string[] = [];
   let totalSize = 0;
-  let truncated = false;
 
   const rel = (fullPath: string) =>
     path.relative(rootDir, fullPath).split(path.sep).join("/");
@@ -48,8 +47,15 @@ export function collectFiles(rootDir: string): CollectedFiles {
       );
       return;
     }
+    // Reserve room for the script the user actually chose.
+    if (depth === 0 && entryScript) {
+      const index = entries.indexOf(entryScript);
+      if (index > 0) {
+        entries.splice(index, 1);
+        entries.unshift(entryScript);
+      }
+    }
     for (const entry of entries) {
-      if (truncated) return;
       if (SKIP_DIRS.has(entry) || entry.startsWith(".")) continue;
       const fullPath = path.join(dir, entry);
       let stat: fs.Stats;
@@ -77,13 +83,9 @@ export function collectFiles(rootDir: string): CollectedFiles {
           continue;
         }
         if (totalSize + stat.size > MAX_TOTAL_SIZE) {
-          truncated = true;
           const limit = MAX_TOTAL_SIZE / 1024 / 1024;
-          skipped.push(
-            `${rel(fullPath)} and remaining files ` +
-            `(exceeds ${limit} MB total limit)`
-          );
-          return;
+          skipped.push(`${rel(fullPath)} (exceeds ${limit} MB total limit)`);
+          continue;
         }
         let data: Buffer;
         try {

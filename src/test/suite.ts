@@ -41,7 +41,12 @@ export async function run(): Promise<void> {
   let tabListener: vscode.Disposable | undefined;
   try {
     const script = path.join(directory, "game.py");
-    fs.writeFileSync(script, "import pyxel\n");
+    fs.writeFileSync(script, [
+      "import pyxel",
+      "pyxel.init(32, 24)",
+      "pyxel.cls(8)",
+      "pyxel.screenshot('first.png', 1)",
+    ].join("\n"));
     await vscode.commands.executeCommand("pyxel.run", vscode.Uri.file(script));
     const opened = await eventually(() => tabs().some((tab) =>
       tab.input instanceof vscode.TabInputWebview
@@ -58,13 +63,26 @@ export async function run(): Promise<void> {
     tabListener = vscode.window.tabGroups.onDidChangeTabs((event) => {
       if (event.closed.some(isRunTab)) runPanelClosed = true;
     });
-    await vscode.window.showTextDocument(vscode.Uri.file(script), { preview: true });
+    const capture = path.join(directory, "first.png");
+    assert.ok(await eventually(() => fs.existsSync(capture), 60000),
+      "the bundled runtime renders and saves a PNG offline");
+    const png = fs.readFileSync(capture);
+    assert.equal(png.readUInt32BE(16), 32);
+    assert.equal(png.readUInt32BE(20), 24);
+
+    const editor = await vscode.window.showTextDocument(vscode.Uri.file(script), { preview: true });
     assert.ok(await eventually(() => tabs().some((tab) =>
       tab.input instanceof vscode.TabInputText && tab.input.uri.fsPath === script
     )), "the game source opens");
     assert.equal(currentRunTabs().length, 1,
       "opening code preserves the running game panel");
     assert.ok(!runPanelClosed, "opening code does not close the running game panel");
+
+    await editor.edit((edit) => edit.insert(editor.document.lineAt(3).range.end,
+      "\npyxel.screenshot('reloaded.png', 1)"));
+    assert.ok(await editor.document.save());
+    assert.ok(await eventually(() => fs.existsSync(path.join(directory, "reloaded.png")), 15000),
+      "saving the active script reruns it in the same panel");
 
     const second = path.join(directory, "second.py");
     fs.writeFileSync(second, "import pyxel\n");

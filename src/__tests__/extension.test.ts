@@ -21,6 +21,7 @@ const vscodeState = vi.hoisted(() => ({
 }));
 
 vi.mock("vscode", () => ({
+  Uri: { joinPath: vi.fn() },
   ViewColumn: { Beside: 2 },
   commands: {
     executeCommand: vscodeState.executeCommand,

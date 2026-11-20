@@ -18,10 +18,9 @@ npm run compile
 Press `F5` in VS Code to launch an Extension Development Host with the
 extension loaded.
 
-The extension host and the Webview are compiled separately, since only the
-Webview sees the DOM: `npm run compile` runs `tsc` for `src` and then for
-`src/webview`, whose output is inlined into the Webview page at runtime. A
-Webview change needs a recompile before it shows up.
+The extension host and Webview use separate TypeScript configurations.
+`npm run compile` builds both and prepares their runtime assets. Once
+`npm ci` has completed, compilation and packaging work offline.
 
 ## Checks
 
@@ -35,23 +34,24 @@ npm run package
 All four must pass before committing, and CI runs the same ones. Add or
 update tests in `src/__tests__` for the modules you change.
 
-CI also runs `npm run test:integration`, which downloads VS Code into
-`.vscode-test/` and checks activation, command registration, run-panel reuse,
-and opening a new resource in the real editor. Run it yourself when you
-change activation, panels, custom editors, `contributes`, or `src/test`.
+CI runs the packaged VSIX in the minimum supported VS Code and the current
+stable release, using a temporary directory outside the checkout. It starts a game with external DNS blocked, checks a
+rendered PNG, saves the script to trigger a reload, and opens a resource in
+the custom editor. Run `npm run test:integration` after changing these paths.
 
-The integration smoke test does not wait for the Web runtime. For Webview
-changes, also launch a game with the pinned runtime, run another script while
-it loads, and open and save a resource in Pyxel Editor.
+## Updating Pyxel
 
-## Pinned upstream version
+`vendor/pyxel` contains the official Pyxel 3.0.3 Web distribution from
+[tag v3.0.3](https://github.com/kitao/pyxel/tree/v3.0.3/wasm). To upgrade,
+replace the loader, style sheet, import hook, wheel, images, and license with
+the files from the same release. Pin the matching `pyodide` npm version and
+refresh the notices under `vendor/pyodide` from Pyxel's Pyodide distribution.
 
-`PYXEL_VERSION` in `src/utils.ts` pins the Pyxel Web runtime loaded from
-`https://kitao.dev/pyxel/<version>/pyxel.js` and the examples downloaded from
-jsDelivr by `Pyxel: Copy Examples`. Pyodide dependencies also load from jsDelivr.
-
-Runtime upgrades are verified by launching the Webview against the new
-runtime, not only by unit tests.
+`scripts/build-runtime.mjs` checks that the loader matches both packages and
+points its bootstrap URL at the bundled Pyodide files. **Copy Examples**
+extracts the official examples directly from the installed wheel on demand,
+omitting the native-only flip example. Verify a 2D game, a Cube example, and a resource save
+from the packaged VSIX when updating the runtime.
 
 ## Releasing
 

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as vscode from "vscode";
 import { PyxelWebviewManager } from "../pyxelWebview";
 
+const assets = { toString: () => "https://local.invalid/webview" } as vscode.Uri;
+
 interface PanelHarness {
   dispose: () => void;
   message: (value: unknown) => void;
@@ -18,6 +20,8 @@ function createPanel(active = false): PanelHarness {
   const postMessage = vi.fn();
   const webview = {
     html: "",
+    asWebviewUri: (uri: vscode.Uri) => uri,
+    cspSource: "https://local.invalid",
     onDidReceiveMessage: vi.fn((handler: (value: unknown) => void) => {
       messageHandler = handler;
       return { dispose: vi.fn() };
@@ -61,7 +65,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("routes validated Webview messages to their host handlers", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel();
     const onReady = vi.fn();
     const onSaved = vi.fn();
@@ -81,7 +85,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("accepts the exact opened resource name, including a POSIX backslash", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel();
     const onSaved = vi.fn();
     manager.initialize(harness.panel, vi.fn(), onSaved, "my\\resource.pyxres");
@@ -92,7 +96,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("records stdout without repeatedly opening the Output panel", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel();
     manager.initialize(harness.panel, vi.fn());
     harness.message({ command: "log", message: "Python diagnostic" });
@@ -101,7 +105,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("rejects malformed and unsafe save messages", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel();
     const onSaved = vi.fn();
     manager.initialize(harness.panel, vi.fn(), onSaved);
@@ -123,7 +127,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("shows output once until the error state is reset", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel();
     manager.initialize(harness.panel, vi.fn());
 
@@ -138,7 +142,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("forwards shortcuts only to the active tracked Webview", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel(true);
     manager.initialize(harness.panel, vi.fn());
 
@@ -157,7 +161,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("does not send a shortcut to a panel after it loses focus", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel(true);
     manager.initialize(harness.panel, vi.fn());
     harness.setActive(false);
@@ -168,7 +172,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("shows errors independently for each panel", () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const first = createPanel();
     const second = createPanel();
     manager.initialize(first.panel, vi.fn());
@@ -182,7 +186,7 @@ describe("PyxelWebviewManager", () => {
   });
 
   it("reports a rejected message delivery without an unhandled rejection", async () => {
-    const manager = new PyxelWebviewManager(outputChannel, () => "/* script */");
+    const manager = new PyxelWebviewManager(outputChannel, assets);
     const harness = createPanel();
     harness.postMessage.mockRejectedValue(new Error("panel closed"));
 

@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import { copyExamples } from "./copyExamples";
 import { createResource, PyxelFileProvider } from "./customEditors";
@@ -5,15 +6,13 @@ import { createDocumentationCommand } from "./documentationPanels";
 import { PyxelWebviewManager } from "./pyxelWebview";
 import { RunPanelController } from "./runPanel";
 import { PYXEL_API_REFERENCE_URL, PYXEL_EDITOR_MANUAL_URL } from "./utils";
-import { readWebviewScript } from "./webviewHtml";
 
 let runPanel: RunPanelController | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel("Pyxel");
-  const webviews = new PyxelWebviewManager(outputChannel, () =>
-    readWebviewScript(context.extensionPath)
-  );
+  const assets = vscode.Uri.joinPath(context.extensionUri, "dist", "webview");
+  const webviews = new PyxelWebviewManager(outputChannel, assets);
   const controller = new RunPanelController(webviews, outputChannel);
   runPanel = controller;
   const fileProvider = new PyxelFileProvider(
@@ -29,7 +28,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("pyxel.newResource", createResource),
     vscode.commands.registerCommand("pyxel.copyExamples", () =>
-      copyExamples(vscode)
+      copyExamples(vscode, path.join(assets.fsPath, "runtime"))
     ),
     vscode.commands.registerCommand(
       "pyxel.apiReference",

@@ -1,9 +1,6 @@
 import * as crypto from "crypto";
 import * as path from "path";
 
-export const PYXEL_VERSION = "3.0.1";
-export const PYXEL_RUNTIME_BASE =
-  `https://kitao.dev/pyxel/${PYXEL_VERSION}`;
 export const PYXEL_API_REFERENCE_URL =
   "https://kitao.dev/pyxel/api-reference/";
 export const PYXEL_EDITOR_MANUAL_URL =

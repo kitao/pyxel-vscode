@@ -1,0 +1,121 @@
+:root {
+  /* Pyxel's 16-color palette plus the web runtime background. */
+  --pyxel-black: #000;
+  --pyxel-navy: #2b335f;
+  --pyxel-purple: #7e2072;
+  --pyxel-green: #19959c;
+  --pyxel-brown: #8b4852;
+  --pyxel-dark-blue: #395c98;
+  --pyxel-light-blue: #a9c1ff;
+  --pyxel-white: #eee;
+  --pyxel-red: #d4186c;
+  --pyxel-orange: #d38441;
+  --pyxel-yellow: #e9c35b;
+  --pyxel-lime: #70c6a9;
+  --pyxel-cyan: #7696de;
+  --pyxel-gray: #a3a3a3;
+  --pyxel-pink: #ff9798;
+  --pyxel-peach: #edc7b0;
+  --pyxel-bg: #202224;
+}
+
+/* Page theme used by the Web Launcher page */
+.pyxel-scheme {
+  color: #fff;
+  background-color: var(--pyxel-bg);
+}
+
+.pyxel-scheme a:link {
+  color: var(--pyxel-light-blue);
+}
+
+.pyxel-scheme a:visited {
+  color: var(--pyxel-cyan);
+}
+
+.pyxel-scheme pre {
+  white-space: pre-wrap;
+}
+
+.pyxel-scheme .code {
+  color: var(--pyxel-orange);
+  font-family: monospace;
+  font-size: large;
+}
+
+/* Full-screen canvas and startup images */
+div#pyxel-screen {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--pyxel-bg);
+}
+
+canvas#canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+img#pyxel-logo {
+  --min-width-ratio: 0.2;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+img#pyxel-prompt {
+  --min-width-ratio: 0.25;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* Touch controls overlaid by wasm/pyxel.js on coarse-pointer devices */
+img#pyxel-gamepad-cross,
+img#pyxel-gamepad-button,
+img#pyxel-gamepad-menu {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+img#pyxel-gamepad-cross {
+  --min-width-ratio: 0.2;
+  position: absolute;
+  left: 1%;
+  bottom: 5%;
+  image-rendering: pixelated;
+  pointer-events: auto;
+}
+
+img#pyxel-gamepad-button {
+  --min-width-ratio: 0.2;
+  position: absolute;
+  right: 1%;
+  bottom: 5%;
+  image-rendering: pixelated;
+  pointer-events: auto;
+}
+
+img#pyxel-gamepad-menu {
+  --min-width-ratio: 0.2;
+  position: absolute;
+  left: 50%;
+  bottom: 1%;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+  pointer-events: auto;
+}

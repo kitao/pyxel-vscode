@@ -8,8 +8,11 @@
 DEVELOPMENT.md
 dist/test/**
 eslint.config.mjs
-node_modules/**
+node_modules/**/README.md
+node_modules/pend/test.js
 package-lock.json
 src/**
 tsconfig.json
 tsconfig.test.json
+vendor/**
+scripts/**

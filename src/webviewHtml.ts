@@ -1,32 +1,19 @@
-import * as fs from "fs";
-import * as path from "path";
-import { PYXEL_RUNTIME_BASE, getNonce } from "./utils";
+import { getNonce } from "./utils";
 
-// src/webview is compiled on its own; the result is inlined into the page so
-// the Webview needs no local resource roots.
-export function readWebviewScript(extensionPath: string): string {
-  return fs.readFileSync(
-    path.join(extensionPath, "dist", "webview", "main.js"),
-    "utf8"
-  );
-}
-
-export function getWebviewHtml(script: string): string {
+export function getWebviewHtml(assetBase: string, cspSource: string): string {
   const nonce = getNonce();
-  // The script is inlined, so a literal </script in it would end the tag.
-  const inlineScript = script.replaceAll("</script", "<\\/script");
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src https://kitao.dev https://cdn.jsdelivr.net;
-      script-src 'nonce-${nonce}' https://kitao.dev https://cdn.jsdelivr.net 'unsafe-eval';
-      style-src https://kitao.dev https://cdn.jsdelivr.net 'unsafe-inline';
-      img-src https://kitao.dev https://cdn.jsdelivr.net data: blob:;
-      connect-src https://kitao.dev https://cdn.jsdelivr.net blob: data:;
+    content="default-src 'none';
+      script-src 'nonce-${nonce}' ${cspSource} 'unsafe-eval';
+      style-src ${cspSource} 'unsafe-inline';
+      img-src ${cspSource} https://kitao.dev https://cdn.jsdelivr.net data: blob:;
+      connect-src ${cspSource} https://kitao.dev https://cdn.jsdelivr.net blob: data:;
       worker-src blob:;
-      font-src https://kitao.dev https://cdn.jsdelivr.net data:;
+      font-src ${cspSource} https://kitao.dev https://cdn.jsdelivr.net data:;
       child-src blob:;">
   <style>
     body {
@@ -40,18 +27,30 @@ export function getWebviewHtml(script: string): string {
     #pyxel-error {
       display: none;
       padding: 16px;
-      color: #ddd;
-      font-family: sans-serif;
-      font-size: 13px;
+      position: absolute;
+      inset: 0 0 auto;
+      z-index: 10000;
+      color: var(--vscode-editor-foreground);
+      background: var(--vscode-editor-background);
+      font: var(--vscode-font-size) var(--vscode-font-family);
+    }
+    #pyxel-error button {
+      margin-left: 12px;
+      padding: 4px 10px;
+      color: var(--vscode-button-foreground);
+      background: var(--vscode-button-background);
+      border: 1px solid var(--vscode-contrastBorder, transparent);
+      cursor: pointer;
+    }
+    #pyxel-error button:focus-visible {
+      outline: 1px solid var(--vscode-focusBorder);
     }
   </style>
 </head>
 <body>
   <div id="pyxel-error" role="alert"></div>
-  <script src="${PYXEL_RUNTIME_BASE}/pyxel.js"></script>
-  <script type="module" nonce="${nonce}">
-${inlineScript}
-  </script>
+  <script nonce="${nonce}" src="${assetBase}/runtime/pyxel.js"></script>
+  <script type="module" nonce="${nonce}" src="${assetBase}/main.js"></script>
 </body>
 </html>`;
 }

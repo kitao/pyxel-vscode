@@ -115,7 +115,7 @@ describe("collectFiles", () => {
     expect(files).toHaveProperty("small.py");
   });
 
-  it("stops when total size exceeds MAX_TOTAL_SIZE", () => {
+  it("keeps the snapshot within MAX_TOTAL_SIZE", () => {
     for (let i = 0; i < 25; i++) {
       const fileName = `file${String(i).padStart(2, "0")}.bin`;
       writeFile(fileName, "x".repeat(1024 * 1024));
@@ -212,15 +212,18 @@ describe("collectFiles", () => {
     expect(skipped).toEqual(["a/b/c/d/ (exceeds depth limit of 3)"]);
   });
 
-  it("reports truncation when total size exceeds MAX_TOTAL_SIZE", () => {
+  it("reserves room for the entry script and continues to smaller assets", () => {
     for (let i = 0; i < 25; i++) {
       const fileName = `file${String(i).padStart(2, "0")}.bin`;
       writeFile(fileName, "x".repeat(1024 * 1024));
     }
-    const { skipped } = collectFiles(tmpDir);
-    expect(skipped).toEqual([
-      "file20.bin and remaining files (exceeds 20 MB total limit)",
-    ]);
+    writeFile("z-game.py", "pass");
+    writeFile("tiny.txt", "data");
+    const { files, skipped } = collectFiles(tmpDir, "z-game.py");
+    expect(Object.keys(files)[0]).toBe("z-game.py");
+    expect(files).toHaveProperty("tiny.txt");
+    expect(Object.keys(files)).toHaveLength(21);
+    expect(skipped).toContain("file19.bin (exceeds 20 MB total limit)");
   });
 
   it("does not report intentional skips (dotfiles, skip dirs)", () => {

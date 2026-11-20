@@ -7,9 +7,8 @@ import { isPyxelRunnable, toErrorMessage } from "./utils";
 
 const RELOAD_DEBOUNCE_MS = 200;
 
-// What the panel is currently running. The three belong together: the panel
-// cannot reload without knowing the script, and neither outlives the panel.
 interface RunSession {
+  captureId: number;
   directory: string;
   panel: vscode.WebviewPanel;
   scriptName: string;
@@ -17,6 +16,8 @@ interface RunSession {
 
 export class RunPanelController {
   private session: RunSession | undefined;
+  // Only held until the new Webview sends its first ready message.
+  private initialFiles: Record<string, string> | undefined;
   private reloadTimer: NodeJS.Timeout | undefined;
   private pendingRun: symbol | undefined;
   private nextSessionId = 0;
@@ -32,6 +33,7 @@ export class RunPanelController {
     this.cancelPendingReload();
     this.session?.panel.dispose();
     this.session = undefined;
+    this.initialFiles = undefined;
     this.captureDirectories.clear();
   }
 
@@ -79,16 +81,23 @@ export class RunPanelController {
       return;
     }
 
-    const running = this.session?.panel;
-    const panel = running ?? this.createPanel();
-    const session = { directory, panel, scriptName };
-    // Keep the current session if the requested script cannot be collected.
-    if (running && !this.sendRunMessage(session)) return;
-    this.session = session;
+    const files = this.readProject(directory, scriptName);
+    if (!files) return;
+    const previous = this.session;
+    const panel = previous?.panel ?? this.createPanel();
+    const captureId = previous?.directory === directory
+      ? previous.captureId : this.nextSessionId++;
+    this.captureDirectories.set(captureId, directory);
+    this.session = { captureId, directory, panel, scriptName };
+    if (!previous || this.initialFiles) {
+      this.initialFiles = files;
+    } else {
+      this.sendRunMessage(this.session, files);
+    }
     panel.title = `Pyxel — ${scriptName}`;
     // Creation already opens a persistent tab. Revealing it again immediately
     // can race that first open and turn it into a replaceable preview tab.
-    if (running) panel.reveal(undefined, true);
+    if (previous) panel.reveal(undefined, true);
   }
 
   private createPanel(): vscode.WebviewPanel {
@@ -105,7 +114,11 @@ export class RunPanelController {
     this.webviews.initialize(
       panel,
       () => {
-        if (this.session?.panel === panel) this.sendRunMessage(this.session);
+        const session = this.session;
+        if (session?.panel !== panel) return;
+        const files = this.initialFiles ?? this.readProject(session.directory, session.scriptName);
+        this.initialFiles = undefined;
+        if (files) this.sendRunMessage(session, files);
       },
       (fileName, data, sessionId) => {
         if (sessionId === undefined) return;
@@ -116,6 +129,7 @@ export class RunPanelController {
       this.pendingRun = undefined;
       this.cancelPendingReload();
       this.session = undefined;
+      this.initialFiles = undefined;
       this.captureDirectories.clear();
     });
     return panel;
@@ -127,7 +141,12 @@ export class RunPanelController {
     this.cancelPendingReload();
     this.reloadTimer = setTimeout(() => {
       this.reloadTimer = undefined;
-      if (this.session) this.sendRunMessage(this.session);
+      const session = this.session;
+      if (!session) return;
+      const files = this.readProject(session.directory, session.scriptName);
+      if (!files) return;
+      if (this.initialFiles) this.initialFiles = files;
+      else this.sendRunMessage(session, files);
     }, RELOAD_DEBOUNCE_MS);
   }
 
@@ -136,30 +155,30 @@ export class RunPanelController {
     this.reloadTimer = undefined;
   }
 
-  private sendRunMessage(session: RunSession): boolean {
-    if (this.pendingRun) return false;
-    this.outputChannel.appendLine(`--- Run ${session.scriptName} ---`);
-    const { files, skipped } = collectFiles(session.directory);
+  private readProject(directory: string, scriptName: string): Record<string, string> | undefined {
+    this.outputChannel.appendLine(`--- Run ${scriptName} ---`);
+    const { files, skipped } = collectFiles(directory, scriptName);
     for (const entry of skipped) {
       this.outputChannel.appendLine(`Skipped ${entry}`);
     }
-    if (!Object.hasOwn(files, session.scriptName)) {
-      const message = `${session.scriptName} was not included in the Pyxel project. ` +
+    if (!Object.hasOwn(files, scriptName)) {
+      const message = `${scriptName} was not included in the Pyxel project. ` +
         "Check that the file exists and is within the project file limits. See Output > Pyxel for details.";
       this.outputChannel.appendLine(message);
       vscode.window.showErrorMessage(message);
-      return false;
+      return undefined;
     }
+    return files;
+  }
+
+  private sendRunMessage(session: RunSession, files: Record<string, string>): void {
     this.webviews.resetErrorState(session.panel.webview);
-    const sessionId = this.nextSessionId++;
-    this.captureDirectories.set(sessionId, session.directory);
     this.webviews.post(session.panel.webview, {
       command: "run",
-      sessionId,
+      sessionId: session.captureId,
       scriptName: session.scriptName,
       files,
     });
-    return true;
   }
 
   private async saveDirtyDocuments(directory: string): Promise<boolean> {

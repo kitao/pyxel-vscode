@@ -1,8 +1,8 @@
 {
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
-  "description": "Run Pyxel games directly in VS Code — no installation required",
-  "version": "1.0.4",
+  "description": "Run Pyxel games, edit pixel art and sound, and explore the official examples offline.",
+  "version": "1.1.0",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {
@@ -255,24 +255,29 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./ && tsc -p src/webview",
+    "compile": "tsc -p ./ && tsc -p src/webview && node scripts/build-runtime.mjs",
     "lint": "eslint src",
     "package": "vsce package",
     "test": "vitest run",
-    "test:integration": "npm run compile && node dist/test/runTest.js",
+    "test:integration": "npm run package && node dist/test/runTest.js",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && npm run compile",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
     "@types/vscode": "~1.85.0",
+    "@types/yauzl": "3.4.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.0.0",
     "eslint": "^10.6.0",
+    "pyodide": "314.0.8",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.63.0",
     "vitest": "^5.0.0"
+  },
+  "dependencies": {
+    "yauzl": "3.4.0"
   }
 }

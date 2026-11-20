@@ -29,21 +29,31 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
     const isResource = path.extname(filePath).toLowerCase() === ".pyxres";
     const directory = path.dirname(filePath);
     let baseline: string | null | undefined;
+    let conflict: { data: string } | undefined;
+    panel.onDidDispose(() => { conflict = undefined; });
 
     const saveResource = async (data: string): Promise<void> => {
+      if (conflict) {
+        conflict.data = data;
+        return;
+      }
       if (baseline === undefined) {
         vscode.window.showErrorMessage("The resource has not loaded. Reopen it before saving.");
         return;
       }
+      let pending: { data: string } | undefined;
       try {
         const current = readBase64(filePath);
         if (current !== baseline) {
+          pending = { data };
+          conflict = pending;
           const choice = await vscode.window.showWarningMessage(
             `${path.basename(filePath)} changed on disk. Overwrite it with the editor contents?`,
             { modal: true },
             "Overwrite"
           );
-          if (choice !== "Overwrite") return;
+          if (conflict !== pending || choice !== "Overwrite") return;
+          data = pending.data;
           if (readBase64(filePath) !== current) {
             vscode.window.showErrorMessage("The resource changed again while confirming. Save again to review the latest conflict.");
             return;
@@ -57,6 +67,8 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
         vscode.window.showErrorMessage(
           `Failed to save ${path.basename(filePath)}: ${toErrorMessage(error)}`
         );
+      } finally {
+        if (conflict === pending) conflict = undefined;
       }
     };
 
@@ -64,6 +76,8 @@ export class PyxelFileProvider implements vscode.CustomReadonlyEditorProvider {
       panel,
       () => {
         if (isResource) {
+          conflict = undefined;
+          baseline = undefined;
           this.send(panel, filePath, () => {
             const fileData = readBase64(filePath);
             const palData = readBase64(filePath.replace(/\.pyxres$/i, ".pyxpal"));

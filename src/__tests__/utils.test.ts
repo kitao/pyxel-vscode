@@ -1,16 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  PYXEL_VERSION,
   isPyxelRunnable,
   getNonce,
   isSafeFileName,
 } from "../utils";
-
-describe("PYXEL_VERSION", () => {
-  it("pins Pyxel to version 3.0.1", () => {
-    expect(PYXEL_VERSION).toBe("3.0.1");
-  });
-});
 
 describe("isPyxelRunnable", () => {
   it("accepts a .py file path", () => {

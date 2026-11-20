@@ -1,3 +1,7 @@
+## 1.1.0
+
+- Bundle Pyxel 3.0.3, Pyodide, and the official examples for offline use
+
 ## 1.0.4
 
 - Update the pinned Pyxel Web runtime and official examples to Pyxel 3.0.1

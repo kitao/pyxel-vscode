@@ -4,36 +4,30 @@
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/kitao.pyxel-vscode)](https://marketplace.visualstudio.com/items?itemName=kitao.pyxel-vscode)
 [![CI](https://github.com/kitao/pyxel-vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/kitao/pyxel-vscode/actions/workflows/ci.yml)
 
-Run [Pyxel](https://github.com/kitao/pyxel) games inside VS Code with nothing
-installed.
+Create and play [Pyxel](https://github.com/kitao/pyxel) games beside your
+code. The extension includes Pyxel 3.0.3, its Python runtime, the resource
+editor, and the official 2D and Cube examples. They work offline from the
+first launch.
 
-The extension embeds the Pyxel Web runtime in a Webview: run a `.py` file next
-to your code, edit `.pyxres` resources in the Pyxel Editor, and play `.pyxapp`
-files.
+## Run your first game
 
-## Features
+1. Choose **Pyxel: Copy Examples** from the command palette and pick a folder.
+2. Select **Open Hello Pyxel** to open the first example in your copy.
+3. Use **Pyxel: Run** in the editor's run menu. The game opens beside the code.
+4. Change the text in `draw()` and save. The running game shows your change.
 
-- **Run games** — `Pyxel: Run`, the editor run button, or right-click a `.py`
-  file in the explorer. The game opens beside your code.
-- **Auto-reload** — the running game reloads when you save a project file,
-  including resources saved in the Pyxel Editor.
-- **Edit resources** — `.pyxres` files open in the Pyxel Editor;
-  `Pyxel: New Resource` creates one.
-- **Play apps** — `.pyxapp` files open in the Pyxel Player.
-- **Copy examples** — `Pyxel: Copy Examples` downloads the official examples
-  for the bundled Pyxel version into a `pyxel_examples` folder, excluding the
-  native-only `99_flip_animation.py` example.
-- **Browse docs** — `Pyxel: API Reference` and `Pyxel: Editor Manual`.
-- **Capture** — screenshots and screencasts taken in the game are saved next
-  to the file you opened. Existing captures are kept; repeated names receive a
-  numbered suffix.
+To try 3D, run `pyxel_examples/cube/c01_hello_cube.py` the same way.
+You can also run any local Pyxel script from its Explorer context menu.
 
-## Getting started
+## Working on a game
 
-1. Run `Pyxel: Copy Examples` from the command palette and pick a folder.
-2. Open `pyxel_examples/01_hello_pyxel.py`.
-3. Press the run button, or run `Pyxel: Run`. The game opens in a panel.
-4. Edit the code and save; the game reloads.
+| Task | In VS Code |
+| --- | --- |
+| Run a script | Choose **Pyxel: Run** with a `.py` file open. Saving code or a resource in its project folder reloads the game. |
+| Edit art, tilemaps, sound, or music | Open a `.pyxres` file or choose **Pyxel: New Resource**. Save in the Pyxel Editor with its save button, Ctrl+S, or Cmd+S. |
+| Play a packaged game | Open a `.pyxapp` file. |
+| Capture a frame or screencast | Use Pyxel's capture controls. Captures appear beside the file you opened. Repeated filenames receive a numbered suffix. |
+| Look up an API or editor tool | **Pyxel: API Reference** and **Pyxel: Editor Manual** open the online documentation beside your code. |
 
 ## Settings
 
@@ -44,12 +38,9 @@ files.
 ## Requirements and limitations
 
 - VS Code 1.85 or newer.
-- The Pyxel Web runtime (Pyxel 3.0.1) is loaded from kitao.dev, so an internet
-  connection is required to launch games. If loading fails or stalls, use
-  **Retry** in the panel after checking your connection.
-- Project files are bundled into the runtime with these limits: 5 MB per file,
-  20 MB in total, 3 directory levels deep. Skipped files are listed in the
-  Pyxel output channel.
+- The project starts in the script's folder. Each run includes up to 5 MiB
+  per file and 20 MiB total, through three levels of subfolders. The entry
+  script takes priority. **Output › Pyxel** lists files skipped by these limits.
 - The extension is disabled in Restricted Mode because running a script
   executes workspace code.
 - Save resource edits with the Pyxel Editor's save button or Ctrl+S / Cmd+S

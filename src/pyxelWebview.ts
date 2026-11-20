@@ -15,7 +15,7 @@ export class PyxelWebviewManager {
 
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
-    private readonly loadScript: () => string
+    private readonly assets: vscode.Uri
   ) {}
 
   initialize(
@@ -26,9 +26,10 @@ export class PyxelWebviewManager {
     resourceFileName?: string
   ): void {
     const webview = panel.webview;
-    webview.options = { enableScripts: true, localResourceRoots: [] };
+    webview.options = { enableScripts: true, localResourceRoots: [this.assets] };
     try {
-      webview.html = getWebviewHtml(this.loadScript());
+      const base = webview.asWebviewUri(this.assets).toString();
+      webview.html = getWebviewHtml(base, webview.cspSource);
     } catch (error: unknown) {
       this.reportError(
         webview,

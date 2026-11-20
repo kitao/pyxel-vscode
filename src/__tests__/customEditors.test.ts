@@ -62,7 +62,7 @@ function createHarness(filePath: string) {
   } as unknown as PyxelWebviewManager;
   const onResourceSaved = vi.fn();
   const provider = new PyxelFileProvider(webviews, onResourceSaved);
-  const panel = { webview: {} } as unknown as vscode.WebviewPanel;
+  const panel = { onDidDispose: vi.fn(), webview: {} } as unknown as vscode.WebviewPanel;
 
   provider.resolveCustomEditor(
     { uri: { fsPath: filePath } } as unknown as vscode.CustomDocument,
@@ -170,6 +170,22 @@ describe("Pyxel Editor (.pyxres)", () => {
     harness.save("game.pyxres", base64("later"));
     expect(fs.readFileSync(filePath, "utf8")).toBe("later");
     expect(vscodeState.showWarningMessage).toHaveBeenCalledOnce();
+  });
+
+  it("saves the latest request under one overwrite confirmation", async () => {
+    const filePath = path.join(tmpDir, "game.pyxres");
+    fs.writeFileSync(filePath, "original");
+    const harness = createHarness(filePath);
+    harness.ready();
+    fs.writeFileSync(filePath, "external");
+    let confirm = (_choice: string) => {};
+    vscodeState.showWarningMessage.mockImplementation(() => new Promise<string>((resolve) => { confirm = resolve; }));
+    harness.save("game.pyxres", base64("first"));
+    harness.save("game.pyxres", base64("second"));
+    expect(vscodeState.showWarningMessage).toHaveBeenCalledOnce();
+    confirm("Overwrite");
+    await vi.waitFor(() => expect(fs.readFileSync(filePath, "utf8")).toBe("second"));
+    expect(harness.onResourceSaved).toHaveBeenCalledOnce();
   });
 
   it("stops if the file changes again while overwrite confirmation is open", async () => {

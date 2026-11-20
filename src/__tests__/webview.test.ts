@@ -169,7 +169,7 @@ describe("PyxelRunner", () => {
       await runner.run("queued");
       await vi.advanceTimersByTimeAsync(RUNTIME_START_TIMEOUT_MS);
       await first;
-      expect(host.reportFatal).toHaveBeenCalledWith(expect.stringContaining("did not finish loading"));
+      expect(host.reportFatal).toHaveBeenCalledWith(expect.stringContaining("did not finish starting"));
       await runner.run("retry");
       finishLaunch();
       await Promise.resolve();

@@ -20,7 +20,7 @@ export type WebviewMessage =
   | { command: "log"; message: string }
   | { command: "saved"; fileName: string; data: string; sessionId?: number };
 
-// Provided by VS Code and by the Pyxel Web runtime loaded from kitao.dev.
+// Provided by VS Code and by the Pyxel Web runtime bundled with the extension.
 declare function acquireVsCodeApi(): {
   postMessage(message: WebviewMessage): void;
 };
@@ -104,8 +104,7 @@ pyxel.cli.play_pyxel_app(name)
 `;
 
 export const RUNTIME_LOAD_ERROR =
-  "Failed to load the Pyxel runtime from kitao.dev. " +
-  "Check your network connection, then retry loading this panel.";
+  "The bundled Pyxel runtime could not load. Retry to reopen this panel.";
 
 export const RUNTIME_START_TIMEOUT_MS = 60_000;
 
@@ -203,7 +202,7 @@ export class PyxelRunner {
       this.host.installSaveBridge();
       const failure = new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => reject(new Error(
-          "The Pyxel runtime did not finish loading. Check your network connection and retry."
+          "The Pyxel runtime did not finish starting. Retry to reopen this panel."
         )), RUNTIME_START_TIMEOUT_MS);
       });
       await Promise.race([
@@ -239,12 +238,8 @@ export function start(): void {
     if (element) {
       element.textContent = message;
       element.style.display = "block";
-      element.style.position = "absolute";
-      element.style.zIndex = "10000";
-      element.style.background = "#222";
       const retry = document.createElement("button");
       retry.textContent = "Retry";
-      retry.style.marginLeft = "12px";
       retry.addEventListener("click", () => window.location.reload());
       element.appendChild(retry);
     }
