@@ -21,6 +21,10 @@ async function main(): Promise<void> {
       extensionTestsPath: path.resolve(__dirname, "suite"),
       version,
       launchArgs: [
+        // GitHub's Linux runners have a virtual display but no hardware GPU.
+        ...(process.platform === "linux" && process.env.GITHUB_ACTIONS === "true"
+          ? ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+          : []),
         "--disable-extensions",
         "--disable-workspace-trust",
         "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost",
