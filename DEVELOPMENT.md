@@ -41,8 +41,8 @@ the custom editor. Run `npm run test:integration` after changing these paths.
 
 ## Updating Pyxel
 
-`vendor/pyxel` contains the official Pyxel 3.0.3 Web distribution from
-[tag v3.0.3](https://github.com/kitao/pyxel/tree/v3.0.3/wasm). To upgrade,
+`vendor/pyxel` contains the official Pyxel 3.0.4 Web distribution from
+[tag v3.0.4](https://github.com/kitao/pyxel/tree/v3.0.4/wasm). To upgrade,
 replace the loader, style sheet, import hook, wheel, images, and license with
 the files from the same release. Pin the matching `pyodide` npm version and
 refresh the notices under `vendor/pyodide` from Pyxel's Pyodide distribution.

@@ -2,7 +2,7 @@
   "name": "pyxel-vscode",
   "displayName": "Pyxel",
   "description": "Run Pyxel games, edit pixel art and sound, and explore the official examples offline.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "kitao",
   "license": "MIT",
   "repository": {

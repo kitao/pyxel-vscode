@@ -5,7 +5,7 @@
 [![CI](https://github.com/kitao/pyxel-vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/kitao/pyxel-vscode/actions/workflows/ci.yml)
 
 Create and play [Pyxel](https://github.com/kitao/pyxel) games beside your
-code. The extension includes Pyxel 3.0.3, its Python runtime, the resource
+code. The extension includes Pyxel 3.0.4, its Python runtime, the resource
 editor, and the official 2D and Cube examples. They work offline from the
 first launch.
 
